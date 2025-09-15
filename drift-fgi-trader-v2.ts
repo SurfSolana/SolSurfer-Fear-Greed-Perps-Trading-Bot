@@ -307,7 +307,7 @@ class DriftFGITrader {
       const collateral = await this.driftWrapper.getCollateral();
       const price = await this.getCurrentPrice();
       const positionSize = (collateral * config.leverage * config.maxPositionRatio) / price;
-      const baseAssetAmount = new BN(positionSize * 1e9); // Convert to base precision
+      const baseAssetAmount = new BN(Math.floor(positionSize * 1_000_000_000)); // Convert to base precision
 
       console.log(chalk.yellow(`📊 Opening ${direction === PositionDirection.LONG ? 'LONG' : 'SHORT'} position: ${positionSize.toFixed(4)} ${config.asset}`));
 
@@ -553,8 +553,41 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start the bot
-trader.start().catch((error) => {
-  console.error(chalk.red('❌ Unhandled error:'), error);
-  process.exit(1);
-});
+// Check for close command
+const isCloseCommand = process.argv[2] === 'close';
+
+if (isCloseCommand) {
+  // Only close positions and exit
+  (async () => {
+    console.log(chalk.cyan('\n🤖 Drift FGI Trading Bot - Close Mode'));
+    console.log(chalk.gray('Version: 2.0 (Refactored)'));
+
+    try {
+      await trader.initializeDrift();
+      await trader.getCurrentPosition();
+
+      if (trader['currentPosition']) {
+        console.log(chalk.yellow('🔄 Closing position...'));
+        const result = await trader.closePosition(trader['currentPosition'].marketIndex);
+        if (result) {
+          console.log(chalk.green('✅ Position closed successfully'));
+        } else {
+          console.log(chalk.red('❌ Failed to close position'));
+        }
+      } else {
+        console.log(chalk.gray('No position to close'));
+      }
+    } catch (error) {
+      console.error(chalk.red('❌ Error closing position:'), error);
+    } finally {
+      await trader['cleanup']();
+      process.exit(0);
+    }
+  })();
+} else {
+  // Start the bot normally
+  trader.start().catch((error) => {
+    console.error(chalk.red('❌ Unhandled error:'), error);
+    process.exit(1);
+  });
+}

@@ -6,7 +6,8 @@ import {
   BASE_PRECISION,
   PRICE_PRECISION,
   convertToNumber,
-  calculatePositionPNL
+  calculatePositionPNL,
+  getMarketOrderParams
 } from '@drift-labs/sdk';
 import { PublicKey, TransactionSignature } from '@solana/web3.js';
 
@@ -54,7 +55,19 @@ export class DriftClientWrapper {
       const position = await this.getPosition(marketIndex);
       if (!position) return null;
 
-      const tx = await this.driftClient.closePerpPosition(marketIndex);
+      // To close a position, place an order in the opposite direction
+      const oppositeDirection = position.direction === PositionDirection.LONG
+        ? PositionDirection.SHORT
+        : PositionDirection.LONG;
+
+      const tx = await this.driftClient.placePerpOrder(
+        getMarketOrderParams({
+          baseAssetAmount: position.baseAssetAmount.abs(),
+          direction: oppositeDirection,
+          marketIndex: marketIndex,
+          reduceOnly: true
+        })
+      );
       console.log(`Position closed. TX: ${tx}`);
       return tx;
     } catch (error) {
@@ -65,11 +78,12 @@ export class DriftClientWrapper {
 
   async openPosition(params: PositionParams): Promise<TransactionSignature | null> {
     try {
-      const tx = await this.driftClient.openPosition(
-        params.direction,
-        params.baseAssetAmount,
-        params.marketIndex,
-        MarketType.PERP
+      const tx = await this.driftClient.placePerpOrder(
+        getMarketOrderParams({
+          baseAssetAmount: params.baseAssetAmount,
+          direction: params.direction,
+          marketIndex: params.marketIndex
+        })
       );
       console.log(`Position opened. TX: ${tx}`);
       return tx;

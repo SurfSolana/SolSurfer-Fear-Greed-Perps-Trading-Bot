@@ -70,12 +70,12 @@
 :root {
   /* REDESIGN COLORS - New Design System */
   --bg-primary: #000000;
-  --bg-secondary: #0a0a0a;
+  --bg-secondary: #1a1a1a; /* Increased contrast from primary */
   --accent-primary: #00ffcc; /* Cyan */
   --accent-danger: #ff0066;  /* Pink */
   --accent-success: #00ff88; /* Green */
   --text-primary: #ffffff;
-  --text-secondary: #888888;
+  --text-secondary: #a0a0a0; /* Brighter for better readability */
 
   /* Typography */
   /* Use next/font provided variables as the source of truth */
@@ -136,7 +136,7 @@
   --destructive-foreground: var(--text-primary);
 
   /* Borders & Inputs */
-  --border: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.2); /* More prominent border */
   --input: var(--bg-secondary);
   --ring: var(--accent-primary);
 
