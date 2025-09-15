@@ -1,823 +1,560 @@
 #!/usr/bin/env bun
 
 import { DriftTradingClient, DRIFT_CONFIG } from './src/drift-client';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import chalk from 'chalk';
 import dotenv from 'dotenv';
+import { mkdirSync, existsSync } from 'fs';
+import { BN } from '@coral-xyz/anchor';
+import { PositionDirection, BASE_PRECISION, PRICE_PRECISION, convertToNumber } from '@drift-labs/sdk';
+
+// Import all refactored modules
+import { ConfigurationManager } from './lib/configuration-manager';
+import { DriftClientWrapper } from './lib/drift-client-wrapper';
+import { PerformanceTracker } from './lib/performance-tracker';
+import { StrategyExecutor, FGIData } from './lib/strategy-executor';
+import {
+  PositionState,
+  createPositionState,
+  updatePositionState,
+  resetPositionState,
+  shouldClosePosition,
+  formatPositionState
+} from './lib/position-state';
+import { readJsonFile, writeJsonFile, ensureFile } from './lib/file-operations';
+import { formatTimestamp, formatTime, formatShortDate } from './lib/date-formatter';
+import { getIntervalMs, getIntervalHours, getProgressIntervalMs, DataInterval } from './lib/data-interval-utils';
+import { getMarketIndex } from './src/market-constants';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
 
-// Configuration
-const CONFIG = {
-  // FGI Trading Parameters (DO NOT CHANGE - Optimal from backtesting)
-  FGI_SHORT_THRESHOLD: 49,  // SHORT when FGI ≤ 49
-  FGI_LONG_THRESHOLD: 50,   // LONG when FGI ≥ 50
-  
-  // Leverage and Risk
-  LEVERAGE: parseFloat(process.env.LEVERAGE || '4'),
-  MAX_POSITION_RATIO: parseFloat(process.env.MAX_POSITION_RATIO || '0.7'),
-  
-  // API Configuration
-  MARKET_SYMBOL: 'ETH',
-  TIMEFRAME: '4h',
-  FGI_API_URL: 'https://api.surfsolana.com/ETH/4h/latest.json',
-  
-  // Operational
-  STATE_FILE: './fgi-drift-state-v2.json',
-  CHECK_INTERVAL_MS: parseInt(process.env.FGI_CHECK_INTERVAL_MS || '300000'),
-  USE_DRIFT_SDK: process.env.USE_DRIFT_SDK === 'true'
-};
-
-// Position state tracking
-interface PositionState {
-  hasOpenPosition: boolean;
-  direction?: 'LONG' | 'SHORT';
-  size?: number;
-  entryPrice?: number;
-  entryFGI?: number;
-  timestamp?: number;
-  lastCheckedFGI?: number;
-  lastCheckTime?: number;
-  lastProcessedTimestamp?: string;  // Track last processed 4h candle
-}
-
-// Daily performance tracking
-interface DailyPerformance {
-  date: string;
-  startBalance: number;
-  currentBalance: number;
-  trades: number;
-  pnl: number;
-  pnlPercent: number;
-}
-
-// FGI data structure
-interface FGIData {
-  price: number;
-  fgi: number;
-  timestamp: string;  // Added timestamp from API
-}
+// State file paths
+const STATE_FILE = './fgi-drift-state-v2.json';
+const DAILY_PERFORMANCE_FILE = './daily-performance.json';
 
 class DriftFGITrader {
   private driftClient?: DriftTradingClient;
+  private driftWrapper?: DriftClientWrapper;
+  private configManager: ConfigurationManager;
+  private performanceTracker: PerformanceTracker;
+  private strategyExecutor: StrategyExecutor;
   private positionState: PositionState;
-  private dailyPerformance: DailyPerformance;
+  private dailyPerformance: any;
   private isRunning: boolean = false;
 
   constructor() {
+    // Initialize managers
+    this.configManager = new ConfigurationManager();
+    this.performanceTracker = new PerformanceTracker('./data/performance.json');
+    this.strategyExecutor = new StrategyExecutor(this.configManager.getConfig());
+
+    // Load state
     this.positionState = this.loadState();
     this.dailyPerformance = this.loadDailyPerformance();
+
+    // Watch for config changes
+    this.configManager.watchConfig((config) => {
+      console.log(chalk.gray(`♻️ Config reloaded: ${config.asset} ${config.dataInterval} L:${config.leverage}x`));
+      this.strategyExecutor.updateConfig(config);
+    });
   }
-  
-  // Load position state from disk
+
   private loadState(): PositionState {
-    try {
-      if (existsSync(CONFIG.STATE_FILE)) {
-        const data = readFileSync(CONFIG.STATE_FILE, 'utf-8');
-        return JSON.parse(data);
-      }
-    } catch (error) {
-      console.error(chalk.yellow('Warning: Could not load state file'));
+    const saved = readJsonFile<any>(STATE_FILE);
+    if (!saved) {
+      return createPositionState();
     }
-    
-    return {
-      hasOpenPosition: false,
+
+    // Convert saved state to PositionState
+    return createPositionState({
+      hasPosition: saved.hasOpenPosition || false,
+      direction: saved.direction === 'LONG' ? PositionDirection.LONG :
+                saved.direction === 'SHORT' ? PositionDirection.SHORT : null,
+      entryPrice: saved.entryPrice || 0,
+      size: saved.size || 0,
+      timestamp: saved.timestamp ? new Date(saved.timestamp) : null,
+      lastFGI: saved.lastCheckedFGI || 0
+    });
+  }
+
+  private saveState(): void {
+    const stateToSave = {
+      hasOpenPosition: this.positionState.hasPosition,
+      direction: this.positionState.direction === PositionDirection.LONG ? 'LONG' :
+                this.positionState.direction === PositionDirection.SHORT ? 'SHORT' : undefined,
+      size: this.positionState.size,
+      entryPrice: this.positionState.entryPrice,
+      entryFGI: this.positionState.lastFGI,
+      timestamp: this.positionState.timestamp?.getTime(),
+      lastCheckedFGI: this.positionState.lastFGI,
       lastCheckTime: Date.now()
     };
-  }
-  
-  // Save position state to disk
-  private saveState(): void {
-    try {
-      writeFileSync(CONFIG.STATE_FILE, JSON.stringify(this.positionState, null, 2));
-    } catch (error) {
-      console.error(chalk.red('Error saving state:'), error);
-    }
+    writeJsonFile(STATE_FILE, stateToSave);
   }
 
-  // Load daily performance tracking
-  private loadDailyPerformance(): DailyPerformance {
-    const today = new Date().toISOString().split('T')[0];
-    const logsDir = './logs';
-    const perfFile = `${logsDir}/daily-performance-${today}.json`;
-
-    // Ensure logs directory exists
-    if (!existsSync(logsDir)) {
-      mkdirSync(logsDir, { recursive: true });
-    }
-
-    try {
-      if (existsSync(perfFile)) {
-        const data = readFileSync(perfFile, 'utf-8');
-        return JSON.parse(data);
-      }
-    } catch (error) {
-      console.error(chalk.yellow('Starting new daily performance tracking'));
-    }
-
-    return {
-      date: today,
+  private loadDailyPerformance(): any {
+    return ensureFile(DAILY_PERFORMANCE_FILE, {
+      date: formatShortDate(new Date()),
       startBalance: 0,
       currentBalance: 0,
       trades: 0,
       pnl: 0,
       pnlPercent: 0
-    };
+    });
   }
 
-  // Save daily performance
   private saveDailyPerformance(): void {
-    const today = new Date().toISOString().split('T')[0];
-    const logsDir = './logs';
-    const perfFile = `${logsDir}/daily-performance-${today}.json`;
-
-    // Ensure logs directory exists
-    if (!existsSync(logsDir)) {
-      mkdirSync(logsDir, { recursive: true });
-    }
-
-    try {
-      writeFileSync(perfFile, JSON.stringify(this.dailyPerformance, null, 2));
-    } catch (error) {
-      console.error(chalk.red('Error saving daily performance:'), error);
-    }
+    writeJsonFile(DAILY_PERFORMANCE_FILE, this.dailyPerformance);
   }
 
-  // Calculate the next expected 4h update time based on current timestamp
-  private calculateNextUpdateTime(currentTimestamp: string): Date {
-    if (!currentTimestamp || typeof currentTimestamp !== 'string') {
-      console.log(chalk.yellow(`Invalid timestamp provided: ${currentTimestamp}, using current time instead`));
-      return new Date(Date.now() + 4 * 60 * 60 * 1000);
-    }
-    
-    const parsedTime = new Date(currentTimestamp);
-    if (isNaN(parsedTime.getTime())) {
-      console.log(chalk.yellow(`Could not parse timestamp: ${currentTimestamp}, using current time instead`));
-      return new Date(Date.now() + 4 * 60 * 60 * 1000);
-    }
-    
-    // Normalize timestamp by subtracting 2 hours to align with UTC
-    const normalizedTime = new Date(parsedTime);
-    normalizedTime.setHours(parsedTime.getHours() - 2);
-    
-    // Calculate next update time based on the normalized time - simple +4 hours approach
-    const nextUpdateTime = new Date(normalizedTime);
-    nextUpdateTime.setHours(normalizedTime.getHours() + 4);
-    
-    console.log(chalk.blue(`Original timestamp: ${currentTimestamp}`));
-    console.log(chalk.blue(`Normalized (UTC aligned) timestamp: ${normalizedTime.toISOString()}`));
-    console.log(chalk.blue(`Next expected 4h update time: ${nextUpdateTime.toISOString()}`));
-    
-    return nextUpdateTime;
-  }
+  private async initializeDrift(): Promise<void> {
+    const config = this.configManager.getConfig();
+    console.log(chalk.cyan(`\n🚀 Initializing Drift client for ${config.asset}...`));
 
-  // Poll the FGI API until we get a new update - matches reference implementation
-  private async pollFgiApiForNewData(lastProcessedTimestamp: string): Promise<FGIData | null> {
-    console.log(chalk.blue(`Starting to poll for new 4h FGI data after timestamp: ${lastProcessedTimestamp}`));
-    
-    console.log(chalk.blue(`Fetching current FGI data from ${CONFIG.FGI_API_URL}`));
-    const initialData = await this.fetchFGIData();
-    
-    if (!initialData) {
-      console.error(chalk.red('Invalid FGI data received from API'));
-      return null;
-    }
-    
-    console.log(chalk.green(`Successfully fetched FGI data: Score=${initialData.fgi}, Timestamp=${initialData.timestamp}`));
-    
-    if (initialData.timestamp !== lastProcessedTimestamp) {
-      console.log(chalk.green(`✅ New 4h FGI data already available! Timestamp: ${initialData.timestamp}, FGI: ${initialData.fgi}`));
-      return initialData;
-    }
-    
-    const nextUpdateTime = this.calculateNextUpdateTime(initialData.timestamp);
-    console.log(chalk.blue(`Current data timestamp: ${initialData.timestamp}`));
-    console.log(chalk.blue(`Next expected 4h data update: ${nextUpdateTime.toISOString()}`));
-    
-    await this.waitUntilNextUpdate(nextUpdateTime);
-    
-    const startTime = Date.now();
-    let pollCount = 0;
-    
-    process.stdout.write(chalk.blue('Polling 4h FGI API '));
-    
-    // Poll continuously until new data arrives - no artificial timeout
-    while (true) {
-      process.stdout.write(chalk.blue('.'));
-      pollCount++;
-      
-      if (pollCount % 60 === 0) {
-        process.stdout.write('\n' + chalk.blue('Polling continues '));
-      }
-      
-      let data;
-      
-      try {
-        data = await this.fetchFGIData();
-      } catch (error) {
-        process.stdout.write('\n');
-        console.error(chalk.red('Error polling 4h FGI API:'), error);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-      
-      if (!data) {
-        process.stdout.write('\n');
-        console.error(chalk.red('Invalid API response structure'));
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-      
-      if (data.timestamp !== lastProcessedTimestamp) {
-        process.stdout.write('\n');
-        console.log(chalk.green(`✅ New 4h FGI data detected! Timestamp: ${data.timestamp}, FGI: ${data.fgi}`));
-        return data;
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-
-  // Wait until the next update time
-  private async waitUntilNextUpdate(nextUpdateTime: Date): Promise<void> {
-    const now = new Date();
-    
-    if (nextUpdateTime > now) {
-      const waitTimeMs = nextUpdateTime.getTime() - now.getTime();
-      const waitTimeMinutes = Math.floor(waitTimeMs / 60000);
-      const waitTimeSeconds = Math.floor((waitTimeMs % 60000) / 1000);
-      
-      // Calculate percentage in 4h cycle
-      const TOTAL_CYCLE_MINUTES = 240;
-      const remainingPercent = (waitTimeMinutes + (waitTimeSeconds / 60)) / TOTAL_CYCLE_MINUTES;
-      const percentComplete = Math.floor((1 - remainingPercent) * 100);
-      
-      console.log(chalk.blue(`⏳ Waiting for next 4h candle at ${nextUpdateTime.toISOString()}`));
-      console.log(chalk.blue(`   ${waitTimeMinutes}m ${waitTimeSeconds}s remaining`));
-      console.log(chalk.blue(`   ${percentComplete}% of 4h cycle complete`));
-      
-      // Show progress updates every minute while waiting
-      const interval = setInterval(() => {
-        const remainingMs = nextUpdateTime.getTime() - Date.now();
-        if (remainingMs <= 0) {
-          clearInterval(interval);
-          return;
-        }
-        const remainingMinutes = Math.floor(remainingMs / 60000);
-        const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
-        const currentPercent = Math.floor((1 - (remainingMinutes / TOTAL_CYCLE_MINUTES)) * 100);
-        console.log(chalk.gray(`   ⏳ ${currentPercent}% complete, ${remainingMinutes}m ${remainingSeconds}s remaining`));
-      }, 60000);
-      
-      await new Promise(resolve => setTimeout(resolve, waitTimeMs));
-      clearInterval(interval);
-      
-      console.log(chalk.green('✅ 4h candle boundary reached!'));
-    }
-  }
-
-  // Fetch current FGI data
-  private async fetchFGIData(): Promise<FGIData | null> {
-    // Check for test mode
-    const testFgiIndex = process.argv.indexOf('--test-fgi');
-    if (testFgiIndex !== -1 && process.argv[testFgiIndex + 1]) {
-      const testFgi = parseInt(process.argv[testFgiIndex + 1]);
-      console.log(chalk.yellow(`🧪 TEST MODE: Using FGI value ${testFgi}`));
-      return {
-        price: 100, // Price doesn't matter for testing
-        fgi: testFgi,
-        timestamp: new Date().toISOString()
-      };
-    }
-    
-    try {
-      const response = await fetch(CONFIG.FGI_API_URL);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Handle both array and object responses
-      const latest = Array.isArray(data) ? data[data.length - 1] : data;
-      
-      if (!latest || typeof latest.price === 'undefined' || typeof latest.fgi === 'undefined') {
-        throw new Error('Invalid API response format');
-      }
-      
-      return {
-        price: parseFloat(latest.price),
-        fgi: parseInt(latest.fgi),
-        timestamp: latest.timestamp || latest.date || new Date().toISOString()
-      };
-    } catch (error) {
-      console.error(chalk.red('Error fetching FGI data:'), error);
-      return null;
-    }
-  }
-  
-  // Initialize Drift client
-  private async initializeDriftClient(): Promise<void> {
-    if (!CONFIG.USE_DRIFT_SDK) {
-      console.log(chalk.yellow('🔧 Running in simulation mode (USE_DRIFT_SDK=false)'));
-      return;
-    }
-    
     const privateKey = process.env.SOLANA_PRIVATE_KEY;
     if (!privateKey) {
       throw new Error('SOLANA_PRIVATE_KEY environment variable is required');
     }
-    
-    this.driftClient = new DriftTradingClient(privateKey);
-    await this.driftClient.initialize();
 
-    // Update daily performance with initial balance
-    if (this.dailyPerformance.startBalance === 0) {
-      const collateralInfo = await this.driftClient.getCollateralInfo();
-      this.dailyPerformance.startBalance = collateralInfo.total;
-      this.dailyPerformance.currentBalance = collateralInfo.total;
-      this.saveDailyPerformance();
-    }
-  }
-  
-  // Execute trading logic
-  private async executeTrade(fgiData: FGIData): Promise<void> {
-    const { fgi, price, timestamp } = fgiData;
-    
-    // Check if we've already processed this timestamp
-    if (this.positionState.lastProcessedTimestamp === timestamp) {
-      console.log(chalk.gray(`Already processed candle at ${timestamp}, skipping...`));
-      return;
-    }
-    
-    console.log(chalk.cyan(`📊 New 4h Candle - FGI: ${fgi}, ETH Price: $${price.toFixed(2)}`));
-    console.log(chalk.cyan(`   Timestamp: ${timestamp}`))
-    
-    // Determine trading signal
-    let signal: 'LONG' | 'SHORT' | 'NONE' = 'NONE';
-    
-    if (fgi <= CONFIG.FGI_SHORT_THRESHOLD) {
-      signal = 'SHORT';
-      console.log(chalk.red(`📉 FGI ${fgi} ≤ ${CONFIG.FGI_SHORT_THRESHOLD} - SHORT signal`));
-    } else if (fgi >= CONFIG.FGI_LONG_THRESHOLD) {
-      signal = 'LONG';
-      console.log(chalk.green(`📈 FGI ${fgi} ≥ ${CONFIG.FGI_LONG_THRESHOLD} - LONG signal`));
-    } else {
-      console.log(chalk.gray(`➖ FGI ${fgi} in neutral zone - no action`));
-      return;
-    }
-    
-    // Handle position management
-    if (this.positionState.hasOpenPosition) {
-      const currentDirection = this.positionState.direction;
-      
-      if (currentDirection === signal) {
-        console.log(chalk.gray(`✅ Already ${signal}, maintaining position`));
-      } else {
-        console.log(chalk.yellow(`🔄 Flipping from ${currentDirection} to ${signal}`));
-        await this.closePosition(fgi, price);
-        await this.settlePNLExplicitly(fgi, price);
-        await this.openPosition(signal, price, fgi);
-      }
-    } else {
-      console.log(chalk.cyan(`🆕 Opening new ${signal} position`));
-      await this.openPosition(signal, price, fgi);
-    }
-    
-    // Update last check and processed timestamp
-    this.positionState.lastCheckedFGI = fgi;
-    this.positionState.lastCheckTime = Date.now();
-    this.positionState.lastProcessedTimestamp = timestamp;
-    this.saveState();
-  }
-  
-  // Open a new position
-  private async openPosition(direction: 'LONG' | 'SHORT', price: number, fgi: number): Promise<void> {
-    if (!CONFIG.USE_DRIFT_SDK || !this.driftClient) {
-      // Simulation mode
-      console.log(chalk.yellow(`[SIMULATED] Opening ${direction} at $${price.toFixed(2)}`));
-      
-      this.positionState = {
-        hasOpenPosition: true,
-        direction,
-        size: 1000, // Simulated size
-        entryPrice: price,
-        entryFGI: fgi,
-        timestamp: Date.now(),
-        lastCheckedFGI: fgi,
-        lastCheckTime: Date.now()
-      };
-      
-      this.saveState();
-      return;
-    }
-    
     try {
-      // Get collateral info
-      const collateralInfo = await this.driftClient.getCollateralInfo();
+      this.driftClient = new DriftTradingClient(privateKey);
+      await this.driftClient.initialize();
+      this.driftWrapper = new DriftClientWrapper(this.driftClient.getClient());
 
-      // Calculate position size - let Drift handle insufficient collateral naturally
-      const positionSize = collateralInfo.free * CONFIG.MAX_POSITION_RATIO * CONFIG.LEVERAGE;
+      console.log(chalk.green('✅ Drift client initialized successfully'));
 
-      console.log(chalk.cyan(`💰 Opening ${direction} position: $${positionSize.toFixed(2)} at ${CONFIG.LEVERAGE}x`));
-      
-      // Execute trade
-      const txSig = await this.driftClient.openPosition(direction, positionSize);
-      
-      console.log(chalk.green(`✅ Position opened! Tx: ${txSig}`));
-      
-      // Update state
-      this.positionState = {
-        hasOpenPosition: true,
-        direction,
-        size: positionSize,
-        entryPrice: price,
-        entryFGI: fgi,
-        timestamp: Date.now(),
-        lastCheckedFGI: fgi,
-        lastCheckTime: Date.now()
-      };
-
-      // Update daily performance
-      this.dailyPerformance.trades++;
-
-      this.saveState();
-      this.saveDailyPerformance();
-      
-    } catch (error) {
-      console.error(chalk.red('❌ Failed to open position:'), error);
-      // Don't update state if trade failed
-    }
-  }
-  
-  // Explicit PnL settlement with visibility
-  private async settlePNLExplicitly(currentFGI: number, currentPrice: number): Promise<void> {
-    if (!CONFIG.USE_DRIFT_SDK || !this.driftClient) {
-      console.log(chalk.gray('[SIMULATED] PnL settlement (no-op)'));
-      return;
-    }
-    
-    try {
-      console.log(chalk.cyan('💸 Explicitly settling PnL for compounding...'));
-      const txSig = await this.driftClient.settlePNL();
-      
-      if (txSig) {
-        console.log(chalk.green(`✅ PnL settlement successful! Tx: ${txSig}`));
-      } else {
-        console.log(chalk.gray('💸 No PnL to settle (already settled)'));
-      }
-      
-    } catch (error) {
-      console.log(chalk.yellow(`⚠️ PnL settlement failed: ${error}. Continuing with new position...`));
-      // Continue execution - settlement failures shouldn't block trading
-    }
-  }
-  
-  // Close existing position
-  private async closePosition(currentFGI: number, currentPrice: number): Promise<void> {
-    if (!this.positionState.hasOpenPosition) {
-      console.log(chalk.yellow('⚠️ No position to close'));
-      return;
-    }
-    
-    const { direction, entryPrice, size } = this.positionState;
-    
-    if (!CONFIG.USE_DRIFT_SDK || !this.driftClient) {
-      // Simulation mode
-      const pnlPercent = direction === 'LONG'
-        ? ((currentPrice - (entryPrice || 0)) / (entryPrice || 1)) * 100 * CONFIG.LEVERAGE
-        : (((entryPrice || 0) - currentPrice) / (entryPrice || 1)) * 100 * CONFIG.LEVERAGE;
-      
-      console.log(chalk.yellow(`[SIMULATED] Closing ${direction} position`));
-      console.log(chalk.yellow(`[SIMULATED] PnL: ${pnlPercent.toFixed(2)}%`));
-      
-      this.positionState = {
-        hasOpenPosition: false,
-        lastCheckedFGI: currentFGI,
-        lastCheckTime: Date.now()
-      };
-      
-      this.saveState();
-      return;
-    }
-    
-    try {
-      // Get actual position from Drift
-      const position = await this.driftClient.getPosition();
-      
-      if (!position.exists) {
-        console.log(chalk.yellow('⚠️ No actual position found on Drift'));
-        this.positionState = {
-          hasOpenPosition: false,
-          lastCheckedFGI: currentFGI,
-          lastCheckTime: Date.now()
+      // Update daily performance starting balance
+      const currentDate = formatShortDate(new Date());
+      if (this.dailyPerformance.date !== currentDate) {
+        const balance = await this.driftWrapper.getCollateral();
+        this.dailyPerformance = {
+          date: currentDate,
+          startBalance: balance,
+          currentBalance: balance,
+          trades: 0,
+          pnl: 0,
+          pnlPercent: 0
         };
-        this.saveState();
-        return;
+        this.saveDailyPerformance();
       }
-      
-      console.log(chalk.cyan(`📉 Closing ${position.direction} position`));
-      console.log(chalk.cyan(`💰 PnL: $${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`));
-      
-      // Execute close
-      const txSig = await this.driftClient.closePosition();
-      
-      console.log(chalk.green(`✅ Position closed! Tx: ${txSig}`));
-
-      // Update daily performance
-      this.dailyPerformance.pnl += position.pnl;
-      const collateralInfo = await this.driftClient.getCollateralInfo();
-      this.dailyPerformance.currentBalance = collateralInfo.total;
-      this.dailyPerformance.pnlPercent =
-        ((this.dailyPerformance.currentBalance - this.dailyPerformance.startBalance) /
-         this.dailyPerformance.startBalance) * 100;
-
-      // Reset state
-      this.positionState = {
-        hasOpenPosition: false,
-        lastCheckedFGI: currentFGI,
-        lastCheckTime: Date.now()
-      };
-
-      this.saveState();
-      this.saveDailyPerformance();
-      
     } catch (error) {
-      console.error(chalk.red('❌ Failed to close position:'), error);
-      // Don't update state if close failed
-    }
-  }
-  
-  // Run single check with smart 4h candle detection
-  async runOnce(): Promise<void> {
-    console.log(chalk.cyan('\n📊 Checking for new 4h candle...'));
-    
-    const fgiData = await this.fetchFGIData();
-    if (!fgiData) {
-      console.log(chalk.red('❌ Failed to fetch FGI data'));
-      return;
-    }
-    
-    // Show current candle info
-    console.log(chalk.cyan(`Current candle timestamp: ${fgiData.timestamp}`));
-    if (this.positionState.lastProcessedTimestamp) {
-      console.log(chalk.cyan(`Last processed: ${this.positionState.lastProcessedTimestamp}`));
-    }
-    
-    await this.executeTrade(fgiData);
-
-    // Show daily performance
-    console.log(chalk.cyan('\n📈 Daily Performance:'));
-    console.log(chalk.cyan(`  Trades: ${this.dailyPerformance.trades}`));
-    console.log(chalk.cyan(`  PnL: $${this.dailyPerformance.pnl.toFixed(2)} (${this.dailyPerformance.pnlPercent.toFixed(2)}%)`));
-
-    // Show next update time
-    const nextUpdateTime = this.calculateNextUpdateTime(fgiData.timestamp);
-    const timeToNext = nextUpdateTime.getTime() - Date.now();
-    const minutesToNext = Math.floor(timeToNext / 60000);
-    console.log(chalk.blue(`\n⏰ Next 4h candle expected in ${minutesToNext} minutes at ${nextUpdateTime.toISOString()}`));
-  }
-  
-  // Run as service with smart 4h candle synchronization
-  async runService(): Promise<void> {
-    console.log(chalk.green('\n🚀 Starting Drift FGI Trading Service (4h Candle Sync)'));
-    console.log(chalk.cyan(`🎯 Strategy: SHORT ≤ ${CONFIG.FGI_SHORT_THRESHOLD}, LONG ≥ ${CONFIG.FGI_LONG_THRESHOLD}`));
-    console.log(chalk.cyan(`💪 Leverage: ${CONFIG.LEVERAGE}x`));
-    console.log(chalk.cyan(`⏰ Syncing with 4h candle boundaries`));
-    
-    this.isRunning = true;
-    
-    // Handle shutdown
-    process.on('SIGINT', async () => {
-      console.log(chalk.yellow('\n🛑 Shutting down...'));
-      this.isRunning = false;
-      
-      if (this.driftClient) {
-        if (CONFIG.USE_DRIFT_SDK) {
-          const position = await this.driftClient.getPosition();
-          if (position.exists) {
-            console.log(chalk.yellow('⚠️ Warning: Open position detected'));
-            console.log(chalk.yellow('Consider closing manually or run with "close" command'));
-          }
-        }
-        
-        await this.driftClient.shutdown();
-      }
-      
-      process.exit(0);
-    });
-    
-    // Initialize with current state
-    const initialData = await this.fetchFGIData();
-    let lastProcessedTimestamp = this.positionState.lastProcessedTimestamp || '';
-    
-    if (initialData && initialData.timestamp !== lastProcessedTimestamp) {
-      console.log(chalk.green('📊 Processing initial candle...'));
-      await this.executeTrade(initialData);
-      lastProcessedTimestamp = initialData.timestamp;
-    }
-    
-    // Main service loop - simplified without fragmented conditionals
-    while (this.isRunning) {
-      console.log(chalk.blue(`\n=== Starting FGI check cycle at ${new Date().toISOString()} ===`));
-      
-      const newData = await this.pollFgiApiForNewData(lastProcessedTimestamp);
-      
-      if (newData) {
-        await this.executeTrade(newData);
-        lastProcessedTimestamp = newData.timestamp;
-
-        console.log(chalk.cyan('\n📈 Daily Performance:'));
-        console.log(chalk.cyan(`  Trades: ${this.dailyPerformance.trades}`));
-        console.log(chalk.cyan(`  PnL: $${this.dailyPerformance.pnl.toFixed(2)} (${this.dailyPerformance.pnlPercent.toFixed(2)}%)`));
-
-        console.log(chalk.green('✅ FGI Processing Cycle Completed'));
-      } else {
-        console.log(chalk.yellow('No new FGI data available. Continuing to next cycle.'));
-      }
-    }
-  }
-  
-  // Close all positions
-  async close(): Promise<void> {
-    console.log(chalk.red('\n🚨 CLOSE ALL POSITIONS'));
-    
-    if (!CONFIG.USE_DRIFT_SDK || !this.driftClient) {
-      console.log(chalk.yellow('Not using real SDK - nothing to close'));
-      return;
-    }
-    
-    await this.driftClient.closeAllPositions();
-    
-    // Reset state
-    this.positionState = {
-      hasOpenPosition: false,
-      lastCheckTime: Date.now()
-    };
-    this.saveState();
-  }
-  
-  // Force trade in specified direction (ignore FGI signal)
-  async forceTrade(direction: 'LONG' | 'SHORT'): Promise<void> {
-    console.log(chalk.cyan(`\n🎯 Force executing ${direction} trade at ${CONFIG.LEVERAGE}x leverage`));
-    
-    // Fetch current FGI data for logging (but don't use for signal)
-    const fgiData = await this.fetchFGIData();
-    const fgi = fgiData?.fgi || 0;
-    const price = fgiData?.price || 0;
-    
-    console.log(chalk.gray(`📊 Current FGI: ${fgi} (ignored)`));
-    console.log(chalk.gray(`💰 Current ETH Price: $${price.toFixed(2)}`));
-    
-    // Check current position status
-    if (CONFIG.USE_DRIFT_SDK && this.driftClient) {
-      const currentPosition = await this.driftClient.getPosition();
-      
-      if (currentPosition.exists) {
-        if (currentPosition.direction === direction) {
-          console.log(chalk.yellow(`⚠️ Already have ${direction} position - this will ADD to it`));
-          console.log(chalk.yellow(`  Current size: ${currentPosition.size.toFixed(4)} ETH`));
-          console.log(chalk.yellow(`  Current PnL: $${currentPosition.pnl.toFixed(2)} (${currentPosition.pnlPercent.toFixed(2)}%)`));
-        } else {
-          console.log(chalk.yellow(`🔄 Will flip from ${currentPosition.direction} to ${direction}`));
-          await this.closePosition(fgi, price);
-          await this.settlePNLExplicitly(fgi, price);
-        }
-      }
-    }
-    
-    // Execute the forced trade
-    await this.openPosition(direction, price, fgi);
-    
-    // Update state
-    this.positionState.lastCheckTime = Date.now();
-    this.positionState.lastCheckedFGI = fgi;
-    this.saveState();
-    
-    console.log(chalk.green(`✅ Force ${direction} trade completed!`));
-  }
-  
-  // Initialize and run
-  async initialize(): Promise<void> {
-    try {
-      await this.initializeDriftClient();
-    } catch (error) {
-      console.error(chalk.red('Failed to initialize:'), error);
+      console.error(chalk.red('❌ Failed to initialize Drift client:'), error);
       throw error;
     }
   }
-}
 
-// Main execution
-async function main() {
-  const command = process.argv[2];
-  
-  console.log(chalk.cyan(`\n🤖 Drift FGI Trader v2.0 - ${DRIFT_CONFIG.ENV.toUpperCase()}`));
-  console.log(chalk.cyan('📊 Strategy: ETH 4h SHORT≤49 LONG≥50 @ 4x Leverage'));
-  
-  const trader = new DriftFGITrader();
-  
-  try {
-    switch (command) {
-      case 'test':
-        console.log(chalk.yellow('\n🧪 Running in test mode...'));
-        await trader.initialize();
-        await trader.runOnce();
-        if (trader['driftClient']) {
-          await trader['driftClient'].shutdown();
-        }
-        break;
-        
-      case 'once':
-        console.log(chalk.cyan('\n⚡ Running single check...'));
-        await trader.initialize();
-        await trader.runOnce();
-        if (trader['driftClient']) {
-          await trader['driftClient'].shutdown();
-        }
-        break;
-        
-      case 'service':
-        console.log(chalk.green('\n🚀 Starting service mode...'));
-        await trader.initialize();
-        await trader.runService();
-        break;
-        
-      case 'close':
-        console.log(chalk.red('\n📉 Closing positions...'));
-        await trader.initialize();
-        await trader.close();
-        if (trader['driftClient']) {
-          await trader['driftClient'].shutdown();
-        }
-        break;
-        
-      case 'check-position':
-        console.log(chalk.cyan('\n📊 Checking positions...'));
-        await trader.initialize();
-        if (CONFIG.USE_DRIFT_SDK && trader['driftClient']) {
-          const position = await trader['driftClient'].getPosition();
-          const collateral = await trader['driftClient'].getCollateralInfo();
-          
-          console.log(chalk.cyan('\n💰 Collateral Info:'));
-          console.log(`  Total: $${collateral.total.toFixed(2)}`);
-          console.log(`  Free: $${collateral.free.toFixed(2)}`);
-          console.log(`  Used: $${collateral.used.toFixed(2)}`);
-          console.log(`  Health: ${collateral.health.toFixed(2)}%`);
-          
-          if (position.exists) {
-            console.log(chalk.cyan('\n📈 Position Info:'));
-            console.log(`  Direction: ${position.direction}`);
-            console.log(`  Size: ${position.size.toFixed(4)} ETH`);
-            console.log(`  Entry: $${position.entryPrice.toFixed(2)}`);
-            console.log(`  Mark: $${position.markPrice.toFixed(2)}`);
-            console.log(`  PnL: $${position.pnl.toFixed(2)} (${position.pnlPercent.toFixed(2)}%)`);
-          } else {
-            console.log(chalk.gray('\nNo open positions'));
-          }
-          
-          await trader['driftClient'].shutdown();
-        } else {
-          console.log(chalk.yellow('Running in simulation mode'));
-        }
-        break;
-        
-      case 'force-long':
-        console.log(chalk.green('\n🎯 Forcing LONG position (ignoring FGI)...'));
-        await trader.initialize();
-        await trader.forceTrade('LONG');
-        if (trader['driftClient']) {
-          await trader['driftClient'].shutdown();
-        }
-        break;
-        
-      case 'force-short':
-        console.log(chalk.red('\n🎯 Forcing SHORT position (ignoring FGI)...'));
-        await trader.initialize();
-        await trader.forceTrade('SHORT');
-        if (trader['driftClient']) {
-          await trader['driftClient'].shutdown();
-        }
-        break;
-        
-      default:
-        console.log(chalk.yellow('\nUsage:'));
-        console.log('  bun run drift-fgi-trader-v2.ts test            # Test connection and FGI');
-        console.log('  bun run drift-fgi-trader-v2.ts once            # Run single trade check');
-        console.log('  bun run drift-fgi-trader-v2.ts service         # Run as service');
-        console.log('  bun run drift-fgi-trader-v2.ts check-position  # Check current positions');
-        console.log('  bun run drift-fgi-trader-v2.ts close           # Close all positions');
-        console.log('  bun run drift-fgi-trader-v2.ts force-long      # Force LONG position (ignore FGI)');
-        console.log('  bun run drift-fgi-trader-v2.ts force-short     # Force SHORT position (ignore FGI)');
-        process.exit(1);
+  private async fetchFGIData(): Promise<FGIData | null> {
+    const config = this.configManager.getConfig();
+    const apiUrl = `https://api.surfsolana.com/${config.asset}/${config.dataInterval}/latest.json`;
+
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data || typeof data.fgi !== 'number') {
+        console.error(chalk.red('❌ Invalid FGI data received'));
+        return null;
+      }
+
+      return {
+        value: data.fgi,
+        timestamp: data.timestamp || new Date().toISOString(),
+        classification: this.classifyFGI(data.fgi)
+      };
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to fetch FGI from ${apiUrl}:`), error);
+      return null;
     }
-  } catch (error) {
-    console.error(chalk.red('\n❌ Fatal error:'), error);
-    process.exit(1);
+  }
+
+  private classifyFGI(value: number): string {
+    if (value <= 25) return 'Extreme Fear';
+    if (value <= 45) return 'Fear';
+    if (value <= 55) return 'Neutral';
+    if (value <= 75) return 'Greed';
+    return 'Extreme Greed';
+  }
+
+  private async getCurrentPosition(): Promise<void> {
+    if (!this.driftWrapper) return;
+
+    const config = this.configManager.getConfig();
+    const marketIndex = getMarketIndex(config.asset, DRIFT_CONFIG.ENV);
+
+    const position = await this.driftWrapper.getPosition(marketIndex);
+
+    if (!position) {
+      this.positionState = resetPositionState(this.positionState);
+    } else {
+      const currentPrice = await this.getCurrentPrice();
+      const size = convertToNumber(position.baseAssetAmount.abs(), BASE_PRECISION);
+      const entryPrice = Math.abs(convertToNumber(position.quoteAssetAmount, PRICE_PRECISION) / size);
+
+      this.positionState = updatePositionState(this.positionState, {
+        hasPosition: true,
+        direction: position.direction,
+        size,
+        entryPrice,
+        timestamp: this.positionState.timestamp || new Date()
+      });
+
+      // Update PnL
+      const pnl = await this.driftWrapper.calculatePnL(marketIndex);
+      this.positionState = updatePositionState(this.positionState, {
+        unrealizedPnL: pnl
+      });
+    }
+  }
+
+  private async getCurrentPrice(): Promise<number> {
+    const config = this.configManager.getConfig();
+    const apiUrl = `https://api.surfsolana.com/${config.asset}/${config.dataInterval}/latest.json`;
+
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+      return data.price || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private async executeStrategy(fgiData: FGIData): Promise<void> {
+    if (!this.driftWrapper || !this.driftClient) return;
+
+    const config = this.configManager.getConfig();
+    const decision = this.strategyExecutor.makeDecision(fgiData.value);
+
+    console.log(chalk.cyan(this.strategyExecutor.formatDecision(decision)));
+
+    // Update last FGI
+    this.positionState = updatePositionState(this.positionState, {
+      lastFGI: fgiData.value,
+      targetDirection: decision.targetDirection
+    });
+
+    // ALWAYS check on-chain position status before any trading action
+    const marketIndex = config.asset === 'ETH' ? 2 : 0;
+    const currentPosition = await this.driftClient.getPosition(marketIndex);
+
+    if (currentPosition.exists) {
+      console.log(chalk.cyan(`📊 On-chain position: ${currentPosition.direction} ${currentPosition.size.toFixed(4)} ${config.asset}`));
+      console.log(chalk.cyan(`   Entry: $${currentPosition.entryPrice.toFixed(2)} | Mark: $${currentPosition.markPrice.toFixed(2)}`));
+      console.log(chalk.cyan(`   PnL: $${currentPosition.pnl.toFixed(2)} (${currentPosition.pnlPercent.toFixed(2)}%)`));
+
+      // Update local state to match chain
+      this.positionState = updatePositionState(this.positionState, {
+        hasPosition: true,
+        direction: currentPosition.direction,
+        size: currentPosition.size,
+        entryPrice: currentPosition.entryPrice,
+        unrealizedPnL: currentPosition.pnl
+      });
+
+      // Check if we should close the existing position
+      const shouldClose = currentPosition.direction === 'LONG' && decision.targetDirection === PositionDirection.SHORT ||
+                         currentPosition.direction === 'SHORT' && decision.targetDirection === PositionDirection.LONG;
+
+      if (shouldClose && decision.shouldTrade) {
+        console.log(chalk.yellow(`🔄 Closing ${currentPosition.direction} to open ${decision.targetDirection === PositionDirection.LONG ? 'LONG' : 'SHORT'}`));
+        await this.closePosition();
+
+        // Wait for close to settle
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Re-check position status before opening new one
+        const afterClose = await this.driftClient.getPosition(marketIndex);
+        if (!afterClose.exists) {
+          await this.openPosition(decision.targetDirection!);
+        } else {
+          console.log(chalk.red('⚠️ Position still exists after close attempt, skipping open'));
+        }
+      } else {
+        console.log(chalk.gray('📊 Keeping existing position'));
+      }
+    } else {
+      // No position exists on-chain
+      this.positionState = updatePositionState(this.positionState, {
+        hasPosition: false,
+        direction: 'NONE',
+        size: 0,
+        entryPrice: 0
+      });
+
+      // Open new position if strategy says so
+      if (decision.shouldTrade) {
+        await this.openPosition(decision.targetDirection!);
+      } else {
+        console.log(chalk.gray('📊 No position, no trade signal'));
+      }
+    }
+
+    this.saveState();
+  }
+
+  private async openPosition(direction: PositionDirection): Promise<void> {
+    if (!this.driftWrapper || !this.driftClient) return;
+
+    const config = this.configManager.getConfig();
+    const marketIndex = getMarketIndex(config.asset, DRIFT_CONFIG.ENV);
+
+    try {
+      // Calculate position size
+      const collateral = await this.driftWrapper.getCollateral();
+      const price = await this.getCurrentPrice();
+      const positionSize = (collateral * config.leverage * config.maxPositionRatio) / price;
+      const baseAssetAmount = new BN(positionSize * 1e9); // Convert to base precision
+
+      console.log(chalk.yellow(`📊 Opening ${direction === PositionDirection.LONG ? 'LONG' : 'SHORT'} position: ${positionSize.toFixed(4)} ${config.asset}`));
+
+      const tx = await this.driftWrapper.openPosition({
+        direction,
+        baseAssetAmount,
+        marketIndex
+      });
+
+      if (tx) {
+        console.log(chalk.green(`✅ Position opened: ${tx}`));
+        this.dailyPerformance.trades++;
+
+        // Update position state
+        this.positionState = updatePositionState(this.positionState, {
+          hasPosition: true,
+          direction,
+          size: positionSize,
+          entryPrice: price,
+          timestamp: new Date()
+        });
+
+        // Track the trade
+        this.performanceTracker.trackTrade(
+          direction === PositionDirection.LONG ? 'LONG' : 'SHORT',
+          positionSize,
+          0, // PnL will be updated when position closes
+          new Date()
+        );
+      }
+    } catch (error) {
+      console.error(chalk.red('❌ Failed to open position:'), error);
+    }
+  }
+
+  private async closePosition(): Promise<void> {
+    if (!this.driftWrapper || !this.positionState.hasPosition) return;
+
+    const config = this.configManager.getConfig();
+    const marketIndex = getMarketIndex(config.asset, DRIFT_CONFIG.ENV);
+
+    try {
+      console.log(chalk.yellow(`📊 Closing ${this.positionState.direction === PositionDirection.LONG ? 'LONG' : 'SHORT'} position`));
+
+      const pnl = await this.driftWrapper.calculatePnL(marketIndex);
+      const tx = await this.driftWrapper.closePosition(marketIndex);
+
+      if (tx) {
+        console.log(chalk.green(`✅ Position closed: ${tx}`));
+        console.log(chalk[pnl >= 0 ? 'green' : 'red'](`💰 Realized PnL: $${pnl.toFixed(2)}`));
+
+        // Update performance
+        this.dailyPerformance.pnl += pnl;
+        this.performanceTracker.trackTrade(
+          this.positionState.direction === PositionDirection.LONG ? 'LONG' : 'SHORT',
+          this.positionState.size,
+          pnl,
+          new Date()
+        );
+
+        // Reset position state
+        this.positionState = resetPositionState(this.positionState);
+        this.positionState.realizedPnL += pnl;
+      }
+    } catch (error) {
+      console.error(chalk.red('❌ Failed to close position:'), error);
+    }
+  }
+
+  private calculateNextUpdateTime(): Date {
+    const config = this.configManager.getConfig();
+    const now = new Date();
+    const intervalHours = getIntervalHours(config.dataInterval);
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+
+    // Calculate next candle boundary
+    const currentCandle = Math.floor(now.getTime() / intervalMs) * intervalMs;
+    const nextCandle = currentCandle + intervalMs;
+
+    return new Date(nextCandle);
+  }
+
+  private async waitUntilNextUpdate(): Promise<void> {
+    const config = this.configManager.getConfig();
+    const nextUpdate = this.calculateNextUpdateTime();
+    const now = new Date();
+    const msUntilNext = nextUpdate.getTime() - now.getTime();
+
+    console.log(chalk.gray(`⏰ Next ${config.dataInterval} candle at ${formatTime(nextUpdate)} (in ${Math.round(msUntilNext / 60000)} minutes)`));
+
+    // Progress updates
+    const progressInterval = getProgressIntervalMs(config.dataInterval);
+    let elapsed = 0;
+
+    while (elapsed < msUntilNext && this.isRunning) {
+      await new Promise(resolve => setTimeout(resolve, progressInterval));
+      elapsed += progressInterval;
+
+      if (this.isRunning) {
+        const remaining = Math.max(0, msUntilNext - elapsed);
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+
+        process.stdout.write(`\r${chalk.gray(`⏳ Waiting for next ${config.dataInterval} candle: ${minutes}m ${seconds}s remaining...`)}`);
+      }
+    }
+
+    console.log(''); // New line after progress
+  }
+
+  private printStatus(): void {
+    const config = this.configManager.getConfig();
+    console.log(chalk.blue('\n' + '='.repeat(60)));
+    console.log(chalk.cyan(formatTimestamp()));
+    console.log(chalk.blue('='.repeat(60)));
+
+    console.log(chalk.white(this.strategyExecutor.getStrategyDescription()));
+    console.log(chalk.white(`Data Interval: ${config.dataInterval}`));
+    console.log(chalk.white(`Max Position: ${(config.maxPositionRatio * 100).toFixed(0)}%`));
+
+    if (this.positionState.hasPosition) {
+      console.log(chalk.yellow('\n📊 Current Position:'));
+      console.log(chalk.white(formatPositionState(this.positionState)));
+    } else {
+      console.log(chalk.gray('\n📊 No open position'));
+    }
+
+    // Show daily performance
+    if (this.dailyPerformance.trades > 0) {
+      const pnlColor = this.dailyPerformance.pnl >= 0 ? 'green' : 'red';
+      console.log(chalk[pnlColor](`\n📈 Daily: ${this.dailyPerformance.trades} trades, PnL: $${this.dailyPerformance.pnl.toFixed(2)}`));
+    }
+
+    // Show performance summary
+    const summary = this.performanceTracker.getPerformanceSummary();
+    if (summary.totalTrades > 0) {
+      const totalColor = summary.totalPnL >= 0 ? 'green' : 'red';
+      console.log(chalk[totalColor](`📊 Total: ${summary.totalTrades} trades, Win Rate: ${summary.winRate.toFixed(1)}%, PnL: $${summary.totalPnL.toFixed(2)}`));
+    }
+
+    console.log(chalk.blue('='.repeat(60)));
+  }
+
+  async start(): Promise<void> {
+    console.log(chalk.cyan('\n🤖 Drift FGI Trading Bot Starting...'));
+    console.log(chalk.gray('Version: 2.0 (Refactored)'));
+
+    if (!this.configManager.isEnabled()) {
+      console.log(chalk.yellow('⏸️ Trading is DISABLED in config. Bot will monitor only.'));
+    }
+
+    try {
+      await this.initializeDrift();
+      this.isRunning = true;
+
+      // Ensure data directory exists
+      if (!existsSync('./data')) {
+        mkdirSync('./data', { recursive: true });
+      }
+
+      console.log(chalk.green('✅ Bot started successfully'));
+
+      while (this.isRunning) {
+        try {
+          // Reload config for hot-reload support
+          this.configManager.loadConfig();
+          const config = this.configManager.getConfig();
+
+          if (!config.enabled) {
+            console.log(chalk.yellow(`\n⏸️ [${formatTime()}] Trading PAUSED - Waiting for next cycle...`));
+            await this.waitUntilNextUpdate();
+            continue;
+          }
+
+          this.printStatus();
+
+          // Fetch FGI data
+          const fgiData = await this.fetchFGIData();
+          if (!fgiData) {
+            console.log(chalk.yellow('⚠️ Could not fetch FGI data, retrying next cycle'));
+            await this.waitUntilNextUpdate();
+            continue;
+          }
+
+          console.log(chalk.cyan(`\n📊 FGI: ${fgiData.value} (${fgiData.classification})`));
+
+          // Get current position
+          await this.getCurrentPosition();
+
+          // Execute strategy
+          await this.executeStrategy(fgiData);
+
+          // Update daily performance
+          if (this.driftWrapper) {
+            const balance = await this.driftWrapper.getCollateral();
+            this.dailyPerformance.currentBalance = balance;
+            this.dailyPerformance.pnl = balance - this.dailyPerformance.startBalance;
+            this.dailyPerformance.pnlPercent = (this.dailyPerformance.pnl / this.dailyPerformance.startBalance) * 100;
+            this.saveDailyPerformance();
+          }
+
+          // Wait for next update
+          await this.waitUntilNextUpdate();
+
+        } catch (error) {
+          console.error(chalk.red('❌ Error in main loop:'), error);
+          await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute on error
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('❌ Fatal error:'), error);
+    } finally {
+      await this.cleanup();
+    }
+  }
+
+  async stop(): Promise<void> {
+    console.log(chalk.yellow('\n🛑 Stopping bot...'));
+    this.isRunning = false;
+  }
+
+  private async cleanup(): Promise<void> {
+    if (this.driftClient) {
+      console.log(chalk.gray('Closing Drift connection...'));
+      await this.driftClient.cleanup();
+    }
+    console.log(chalk.green('✅ Bot stopped'));
   }
 }
 
-// Run if called directly
-// This works with tsx, ts-node, and bun
-main().catch(console.error);
+// Signal handlers
+const trader = new DriftFGITrader();
+
+process.on('SIGINT', async () => {
+  console.log(chalk.yellow('\n⚠️ Received SIGINT'));
+  await trader.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log(chalk.yellow('\n⚠️ Received SIGTERM'));
+  await trader.stop();
+  process.exit(0);
+});
+
+// Start the bot
+trader.start().catch((error) => {
+  console.error(chalk.red('❌ Unhandled error:'), error);
+  process.exit(1);
+});

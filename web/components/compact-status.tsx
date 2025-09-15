@@ -1,7 +1,7 @@
 'use client'
 
 import { TradingStatus, TradingParameters } from '@/lib/types'
-import { Circle, Play, Square } from 'lucide-react'
+import { Circle, Play, Square, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 
@@ -15,6 +15,7 @@ interface CompactStatusProps {
   onParametersChange: (params: TradingParameters) => void
   onStart: () => void
   onStop: () => void
+  onSave?: () => void
 }
 
 export function CompactStatus({
@@ -27,6 +28,7 @@ export function CompactStatus({
   onParametersChange,
   onStart,
   onStop,
+  onSave,
 }: CompactStatusProps) {
   const isActive = botStatus?.isActive || false
   const formatPnL = (pnl: number) => {
@@ -105,6 +107,19 @@ export function CompactStatus({
                 </>
               )}
             </Button>
+
+            {/* Save Settings Button */}
+            {onSave && (
+              <Button
+                onClick={onSave}
+                size="sm"
+                variant="outline"
+                className="h-8 px-4 font-semibold"
+              >
+                <Save className="w-3 h-3 mr-1" />
+                SAVE
+              </Button>
+            )}
 
             {/* Leverage Slider */}
             <div className="hidden md:flex items-center gap-2 ml-4">

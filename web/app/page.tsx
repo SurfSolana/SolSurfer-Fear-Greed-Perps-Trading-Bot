@@ -144,6 +144,32 @@ export default function TradingDashboard() {
     })
   }, [parameters])
 
+  const handleSave = useCallback(async () => {
+    try {
+      const response = await fetch('/api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset: parameters.asset || 'ETH',
+          leverage: parameters.leverage,
+          lowThreshold: parameters.lowThreshold ?? 49,
+          highThreshold: parameters.highThreshold ?? 50,
+          maxPositionRatio: 1.0, // Use 100% of available collateral
+          strategy: parameters.strategy || 'momentum',
+          enabled: botStatus.isActive,
+          timeframe: parameters.dataInterval || '4h'
+        })
+      })
+
+      if (response.ok) {
+        console.log('Settings saved successfully')
+        // Optionally show a toast notification here
+      }
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+    }
+  }, [parameters, botStatus.isActive])
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Top status bar with integrated controls */}
@@ -156,6 +182,7 @@ export default function TradingDashboard() {
         onParametersChange={handleParametersChange}
         onStart={handleStart}
         onStop={handleStop}
+        onSave={handleSave}
         className="fixed top-0 left-0 right-0 z-50"
       />
 
