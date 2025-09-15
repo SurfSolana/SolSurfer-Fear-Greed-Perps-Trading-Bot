@@ -9,6 +9,7 @@ import { PositionDirection, BASE_PRECISION, PRICE_PRECISION, convertToNumber } f
 
 // Import all refactored modules
 import { ConfigurationManager } from './lib/configuration-manager';
+import { getPerpMarket } from './lib/get-perp-market';
 import { DriftClientWrapper } from './lib/drift-client-wrapper';
 import { PerformanceTracker } from './lib/performance-tracker';
 import { StrategyExecutor, FGIData } from './lib/strategy-executor';
@@ -23,7 +24,6 @@ import {
 import { readJsonFile, writeJsonFile, ensureFile } from './lib/file-operations';
 import { formatTimestamp, formatTime, formatShortDate } from './lib/date-formatter';
 import { getIntervalMs, getIntervalHours, getProgressIntervalMs, DataInterval } from './lib/data-interval-utils';
-import { getMarketIndex } from './src/market-constants';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -183,7 +183,7 @@ class DriftFGITrader {
     if (!this.driftWrapper) return;
 
     const config = this.configManager.getConfig();
-    const marketIndex = getMarketIndex(config.asset, DRIFT_CONFIG.ENV);
+    const marketIndex = getPerpMarket('ETH').marketIndex;
 
     const position = await this.driftWrapper.getPosition(marketIndex);
 
@@ -300,7 +300,7 @@ class DriftFGITrader {
     if (!this.driftWrapper || !this.driftClient) return;
 
     const config = this.configManager.getConfig();
-    const marketIndex = getMarketIndex(config.asset, DRIFT_CONFIG.ENV);
+    const marketIndex = getPerpMarket('ETH').marketIndex;
 
     try {
       // Calculate position size
@@ -347,7 +347,7 @@ class DriftFGITrader {
     if (!this.driftWrapper || !this.positionState.hasPosition) return;
 
     const config = this.configManager.getConfig();
-    const marketIndex = getMarketIndex(config.asset, DRIFT_CONFIG.ENV);
+    const marketIndex = getPerpMarket('ETH').marketIndex;
 
     try {
       console.log(chalk.yellow(`📊 Closing ${this.positionState.direction === PositionDirection.LONG ? 'LONG' : 'SHORT'} position`));
