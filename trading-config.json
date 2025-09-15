@@ -1,0 +1,10 @@
+{
+  "asset": "ETH",
+  "leverage": 4,
+  "lowThreshold": 49,
+  "highThreshold": 50,
+  "maxPositionRatio": 1.0,
+  "strategy": "momentum",
+  "enabled": true,
+  "dataInterval": "4h"
+}

@@ -222,6 +222,48 @@ The web interface will be available at [http://localhost:3000](http://localhost:
 
 These controls are display-only for now. Full integration with the trading bot is in progress. Currently, the web UI is best used for viewing backtest results and analyzing historical performance.
 
+## PM2 Process Management
+
+The bot can be managed using PM2 for production deployments with hot-reloadable configuration:
+
+### Setup PM2
+```bash
+# Install PM2 globally
+bun add -g pm2
+
+# Start both bot and web UI
+bun run pm2:start
+
+# View logs
+bun run pm2:logs
+
+# Stop all processes
+bun run pm2:stop
+
+# Restart all processes
+bun run pm2:restart
+
+# View status
+bun run pm2:status
+```
+
+### Hot Configuration Reload
+
+The bot reads configuration from `trading-config.json` on each trading cycle, allowing parameter changes without restarts:
+
+1. **From Web UI**: Use the SAVE button after changing parameters
+2. **Manual Edit**: Modify `trading-config.json` directly
+3. **Test Script**: Run `bun run test-hot-config.ts` to verify hot-reload
+
+Configuration includes:
+- `asset`: Trading pair (ETH, SOL, BTC)
+- `leverage`: 1-20x leverage
+- `lowThreshold`: FGI threshold for SHORT (0-100)
+- `highThreshold`: FGI threshold for LONG (0-100)
+- `maxPositionRatio`: Portion of collateral to use (0.1-1.0)
+- `strategy`: "momentum" or "contrarian"
+- `enabled`: true/false to pause trading
+
 ## Development
 
 ### Running Backtests

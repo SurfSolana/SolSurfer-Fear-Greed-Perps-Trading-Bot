@@ -90,6 +90,20 @@ export interface TradingParameters {
 }
 
 /**
+ * TradingConfig - Hot-reloadable configuration for the trading bot
+ */
+export interface TradingConfig {
+  asset: string;
+  leverage: number;
+  lowThreshold: number;
+  highThreshold: number;
+  maxPositionRatio: number;
+  strategy: 'momentum' | 'contrarian';
+  enabled: boolean;
+  timeframe: '15min' | '1h' | '4h' | '24h';
+}
+
+/**
  * BacktestResult - Results from historical simulation
  */
 export interface BacktestResult {
