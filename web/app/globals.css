@@ -1,0 +1,904 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+/* Layout grid styles excluded */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Custom slider styles for filters */
+.slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: rgb(34 211 238);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-thumb::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: rgb(34 211 238);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.slider-thumb::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, rgb(34 211 238) var(--value), rgba(255, 255, 255, 0.1) var(--value));
+}
+
+:root {
+  /* REDESIGN COLORS - New Design System */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --accent-primary: #00ffcc; /* Cyan */
+  --accent-danger: #ff0066;  /* Pink */
+  --accent-success: #00ff88; /* Green */
+  --text-primary: #ffffff;
+  --text-secondary: #888888;
+
+  /* Typography */
+  /* Use next/font provided variables as the source of truth */
+  /* Tailwind v4 maps font-sans/font-mono to --font-sans/--font-mono via @theme above */
+  /* We also provide aliases for existing code that referenced older variable names */
+  --font-display: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  /* Aliases to keep legacy references working */
+  --font-family-primary: var(--font-geist-sans);
+  --font-family-display: var(--font-geist-sans);
+  --font-family-mono: var(--font-geist-mono);
+
+  /* Typography scale and weights */
+  --font-size-base: 16px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+  --font-size-4xl: 36px;
+  --line-height-normal: 1.6;
+  --line-height-tight: 1.2;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-wide: 0.08em;
+
+  /* Tailwind Integration */
+  --radius: 0.5rem;
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --card: var(--bg-secondary);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-secondary);
+  --popover-foreground: var(--text-primary);
+
+  /* Primary Colors */
+  --primary: var(--accent-primary);
+  --primary-foreground: var(--bg-primary);
+
+  /* Secondary Colors */
+  --secondary: var(--bg-secondary);
+  --secondary-foreground: var(--text-secondary);
+
+  /* Muted Colors */
+  --muted: var(--bg-secondary);
+  --muted-foreground: var(--text-secondary);
+
+  /* Accent Colors */
+  --accent: var(--bg-secondary);
+  --accent-foreground: var(--text-primary);
+
+  /* Semantic Colors */
+  --destructive: var(--accent-danger);
+  --destructive-foreground: var(--text-primary);
+
+  /* Borders & Inputs */
+  --border: rgba(255, 255, 255, 0.1);
+  --input: var(--bg-secondary);
+  --ring: var(--accent-primary);
+
+  /* Chart Colors */
+  --chart-1: var(--accent-primary);
+  --chart-2: var(--accent-success);
+  --chart-3: #ffaa00;
+  --chart-4: #0088ff;
+  --chart-5: var(--accent-danger);
+}
+
+/* Dark mode is the default - crypto aesthetic is inherently dark */
+.dark,
+[data-theme="dark"] {
+  /* Inherit the crypto theme variables - already dark by design */
+  --background: var(--color-bg-primary);
+  --foreground: var(--color-text-primary);
+}
+
+@layer base {
+  /* Global Crypto Theme Base Styles */
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Ensure the base font is Geist Sans (from next/font) with robust fallbacks */
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+    line-height: var(--line-height-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    transition: background-color var(--duration-300) var(--ease-out);
+  }
+
+  /* Crypto-themed selection */
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-text-inverse);
+    text-shadow: none;
+  }
+
+  ::-moz-selection {
+    background-color: var(--color-primary);
+    color: var(--color-text-inverse);
+    text-shadow: none;
+  }
+
+  /* Custom Scrollbar with Glow */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-full);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-primary);
+    border-radius: var(--radius-full);
+    transition: all var(--duration-200) var(--ease-out);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary);
+    box-shadow: var(--glow-primary-sm);
+  }
+
+  /* Enhanced Focus Styles with Neon */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--glow-primary-sm);
+  }
+
+  :focus {
+    outline: none;
+  }
+
+  /* Headings with Crypto Styling */
+  h1, h2, h3, h4, h5, h6 {
+    /* Use the display font; default to Geist Sans */
+    font-family: var(--font-geist-sans);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    letter-spacing: var(--letter-spacing-tight);
+    color: var(--color-text-primary);
+  }
+
+  h1 {
+    font-size: var(--font-size-4xl);
+    font-weight: var(--font-weight-bold);
+  }
+
+  h2 {
+    font-size: var(--font-size-3xl);
+  }
+
+  h3 {
+    font-size: var(--font-size-2xl);
+  }
+
+  h4 {
+    font-size: var(--font-size-xl);
+  }
+
+  h5 {
+    font-size: var(--font-size-lg);
+  }
+
+  h6 {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+  }
+
+  /* Links with Glow */
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: all var(--duration-200) var(--ease-out);
+  }
+
+  a:hover {
+    color: var(--color-primary-light);
+    text-shadow: var(--glow-primary-sm);
+  }
+
+  /* Code Elements */
+  code, pre {
+    /* Ensure code blocks use the mono font (Geist Mono) with fallbacks */
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  code {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+
+  pre {
+    padding: var(--space-4);
+    overflow-x: auto;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+  }
+}
+
+@layer utilities {
+  /* ============================================================================
+   * CRYPTO UI COMPONENTS
+   * ============================================================================ */
+
+  /* Buttons with Neon Glow Effects */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-medium);
+    transition: all var(--duration-200) var(--ease-out);
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    user-select: none;
+  }
+
+  .btn-primary {
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    padding: var(--button-padding-md);
+    height: var(--button-height-md);
+    box-shadow: var(--glow-primary-sm), var(--shadow-md);
+    border: 1px solid var(--color-primary);
+  }
+
+  .btn-primary:hover {
+    background: var(--color-primary-light);
+    box-shadow: var(--glow-primary-md), var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: var(--glow-primary-sm), var(--shadow-base);
+  }
+
+  .btn-secondary {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+    padding: var(--button-padding-md);
+    height: var(--button-height-md);
+    border: 1px solid var(--color-border-primary);
+    box-shadow: var(--shadow-base);
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-bg-elevated);
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary-sm), var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    background: var(--color-danger);
+    color: var(--color-text-primary);
+    padding: var(--button-padding-md);
+    height: var(--button-height-md);
+    box-shadow: var(--glow-danger-sm), var(--shadow-md);
+    border: 1px solid var(--color-danger);
+  }
+
+  .btn-danger:hover {
+    background: var(--color-danger-dark);
+    box-shadow: var(--glow-danger-md), var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+  .btn-success {
+    background: var(--color-success);
+    color: var(--color-text-inverse);
+    padding: var(--button-padding-md);
+    height: var(--button-height-md);
+    box-shadow: var(--glow-success-sm), var(--shadow-md);
+    border: 1px solid var(--color-success);
+  }
+
+  .btn-success:hover {
+    background: var(--color-success-dark);
+    box-shadow: var(--glow-success-md), var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+  /* Cards with Glassmorphism */
+  .card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--card-padding-md);
+    box-shadow: var(--shadow-lg);
+    transition: all var(--duration-300) var(--ease-out);
+  }
+
+  .card-glass {
+    background: var(--color-bg-glass);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    padding: var(--card-padding-md);
+    box-shadow: var(--shadow-xl);
+    transition: all var(--duration-300) var(--ease-out);
+  }
+
+  .card-glass:hover {
+    border-color: var(--color-border-glow);
+    box-shadow: var(--glow-primary-sm), var(--shadow-2xl);
+    transform: translateY(-2px);
+  }
+
+  .card-elevated {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-lg);
+    padding: var(--card-padding-md);
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* Form Elements with Crypto Styling */
+  .input {
+    width: 100%;
+    height: var(--input-height-md);
+    padding: var(--input-padding-md);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border-primary);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    transition: all var(--duration-200) var(--ease-out);
+  }
+
+  .input:focus {
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary-sm);
+    background: var(--color-bg-elevated);
+  }
+
+  .input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  /* Navigation Elements */
+  .nav {
+    background: var(--color-bg-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--color-border-secondary);
+    height: var(--nav-height);
+  }
+
+  .nav-item {
+    color: var(--color-text-secondary);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    transition: all var(--duration-200) var(--ease-out);
+    text-decoration: none;
+  }
+
+  .nav-item:hover {
+    color: var(--color-primary);
+    background: var(--color-bg-tertiary);
+    text-shadow: var(--glow-primary-sm);
+  }
+
+  .nav-item.active {
+    color: var(--color-primary);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-accent);
+    box-shadow: var(--glow-primary-sm);
+  }
+
+  /* Loading States with Glow */
+  .loading {
+    @apply animate-pulse;
+    background: linear-gradient(
+      90deg,
+      var(--color-bg-secondary) 25%,
+      var(--color-bg-tertiary) 50%,
+      var(--color-bg-secondary) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Chart Container */
+  .chart-container {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(0, 255, 204, 0.02) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  /* Modal/Overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--color-bg-overlay);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-8);
+    box-shadow: var(--shadow-2xl), var(--glow-primary-sm);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+  }
+
+  /* Tooltips */
+  .tooltip {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    box-shadow: var(--shadow-lg), var(--glow-primary-sm);
+    border: 1px solid var(--color-border-glow);
+    z-index: var(--z-tooltip);
+  }
+
+  /* Mobile-optimized touch targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Enhanced slider for touch devices */
+  .touch-slider {
+    @apply h-8;
+  }
+
+  .touch-slider [role="slider"] {
+    @apply h-6 w-6;
+    background: var(--color-primary);
+    border: 2px solid var(--color-primary);
+    box-shadow: var(--glow-primary-sm);
+  }
+
+  /* Prevent text selection on interactive elements */
+  .select-none {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Mobile Responsive Enhancements */
+  @media (max-width: 768px) {
+    html {
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      touch-action: manipulation;
+    }
+
+    body {
+      overscroll-behavior: contain;
+      touch-action: manipulation;
+    }
+
+    /* Better tap highlight with crypto colors */
+    button, [role="button"], [role="slider"] {
+      -webkit-tap-highlight-color: rgba(0, 255, 204, 0.2);
+    }
+
+    /* Prevent zoom on input focus */
+    input, select, textarea {
+      font-size: 16px;
+    }
+
+    /* Optimize form elements for touch with glow */
+    input[type="range"] {
+      -webkit-appearance: none;
+      height: 44px;
+      background: var(--color-bg-tertiary);
+      border-radius: var(--radius-full);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 24px;
+      width: 24px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      border: 2px solid var(--color-primary);
+      cursor: pointer;
+      box-shadow: var(--glow-primary-sm);
+    }
+
+    /* Mobile card spacing */
+    .card,
+    .card-glass,
+    .card-elevated {
+      margin: var(--space-4);
+      padding: var(--space-4);
+    }
+
+    /* Mobile button sizing */
+    .btn {
+      min-height: 44px;
+      padding: var(--space-3) var(--space-6);
+    }
+  }
+
+  /* Pull-to-refresh indicator spacing */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Enhanced Animation utilities */
+  .animate-in {
+    animation-fill-mode: both;
+  }
+
+  .slide-in-from-top-2 {
+    animation: slide-in-from-top-2 0.3s ease-out;
+  }
+
+  @keyframes slide-in-from-top-2 {
+    from {
+      transform: translateY(-8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Crypto-specific animations */
+  .glow-pulse {
+    animation: glow-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% {
+      box-shadow: var(--glow-primary-sm);
+    }
+    50% {
+      box-shadow: var(--glow-primary-md);
+    }
+  }
+
+  .fade-in-up {
+    animation: fade-in-up var(--duration-500) var(--ease-out);
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+/* ============================================================================
+ * ADDITIONAL CRYPTO UI UTILITIES
+ * ============================================================================ */
+
+/* Interactive Elements */
+.focus-ring {
+  @apply focus:outline-none;
+  box-shadow: 0 0 0 2px var(--color-primary), var(--glow-primary-sm);
+}
+
+.card-interactive {
+  @apply transition-all;
+  transition-duration: var(--duration-200);
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl), var(--glow-primary-sm);
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+  transition-duration: var(--duration-75);
+}
+
+/* Error States with Neon */
+.error-shake {
+  animation: error-shake 0.5s ease-in-out;
+}
+
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.error-border {
+  border-color: var(--color-danger) !important;
+  box-shadow: var(--glow-danger-sm) !important;
+}
+
+.success-border {
+  border-color: var(--color-success) !important;
+  box-shadow: var(--glow-success-sm) !important;
+}
+
+/* Status Indicators */
+.status-online {
+  color: var(--color-success);
+  text-shadow: var(--glow-success-sm);
+}
+
+.status-offline {
+  color: var(--color-text-muted);
+}
+
+.status-error {
+  color: var(--color-danger);
+  text-shadow: var(--glow-danger-sm);
+}
+
+.status-warning {
+  color: var(--color-warning);
+  text-shadow: var(--glow-warning-sm);
+}
+
+/* Price Movement Indicators */
+.price-up {
+  color: var(--color-success);
+  text-shadow: var(--glow-success-sm);
+}
+
+.price-down {
+  color: var(--color-danger);
+  text-shadow: var(--glow-danger-sm);
+}
+
+.price-neutral {
+  color: var(--color-text-secondary);
+}
+
+/* Data Tables */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border-primary);
+}
+
+.table th {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.table td {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border-secondary);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+}
+
+.table tr:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.badge-primary {
+  background: rgba(var(--color-primary-rgb), 0.2);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  text-shadow: var(--glow-primary-sm);
+}
+
+.badge-success {
+  background: rgba(var(--color-success-rgb), 0.2);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.badge-danger {
+  background: rgba(var(--color-danger-rgb), 0.2);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.badge-warning {
+  background: rgba(var(--color-warning-rgb), 0.2);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
+/* Mobile Enhancements */
+.mobile-loading {
+  @apply animate-pulse;
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-secondary) 25%,
+    var(--color-bg-tertiary) 50%,
+    var(--color-bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading-shimmer 2s infinite ease-in-out;
+}
+
+.thumb-zone {
+  @apply min-h-[44px] min-w-[44px] p-3;
+  border-radius: var(--radius-lg);
+  transition: all var(--duration-200) var(--ease-out);
+}
+
+.thumb-zone:active {
+  background: var(--color-bg-tertiary);
+  transform: scale(0.95);
+}
+
+.mobile-full-width {
+  width: calc(100vw - 2rem);
+  margin-left: calc(-50vw + 50% + 1rem);
+}
+
+/* Utility Classes */
+.text-glow {
+  text-shadow: var(--glow-primary-sm);
+}
+
+.border-glow {
+  border-color: var(--color-primary);
+  box-shadow: var(--glow-primary-sm);
+}
+
+.bg-glass {
+  background: var(--color-bg-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.transition-crypto {
+  transition: all var(--duration-300) var(--ease-cyber);
+}

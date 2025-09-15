@@ -1,0 +1,38 @@
+{
+  "description": "Backtest data catalog for Lifeguard Token Vault",
+  "organized_results": {
+    "path": "./",
+    "description": "Clean, organized backtest results by asset and strategy",
+    "assets": ["BTC", "ETH", "SOL"],
+    "strategies": ["momentum", "contrarian"],
+    "structure": {
+      "btc": {
+        "momentum": "./btc/momentum/complete-results.json",
+        "contrarian": "./btc/contrarian/complete-results.json"
+      },
+      "eth": {
+        "momentum": "./eth/momentum/complete-results.json",
+        "contrarian": "./eth/contrarian/complete-results.json"
+      },
+      "sol": {
+        "momentum": "./sol/momentum/complete-results.json",
+        "contrarian": "./sol/contrarian/complete-results.json"
+      }
+    }
+  },
+  "raw_archive": {
+    "path": "./archive/raw-results/",
+    "description": "Raw timestamped backtest results (4,262+ files)",
+    "file_count": 4262,
+    "note": "Historical data, use organized_results for analysis"
+  },
+  "best_performer": {
+    "strategy": "ETH momentum",
+    "fgi_threshold": 50,
+    "leverage": 9,
+    "total_return": "2774%",
+    "monthly_return": "231%",
+    "note": "Discovered from real backtest data analysis"
+  },
+  "last_updated": "2025-09-14"
+}
