@@ -1,1 +1,16 @@
-{}
+{
+  "09/15": {
+    "date": "09/15",
+    "pnl": -0.358805,
+    "trades": 1,
+    "winRate": 0,
+    "positions": [
+      {
+        "direction": "SHORT",
+        "size": 0.016,
+        "pnl": -0.358805,
+        "timestamp": "2025-09-15T23:20:37.664Z"
+      }
+    ]
+  }
+}
