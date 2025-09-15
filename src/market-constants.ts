@@ -7,8 +7,10 @@ import { MainnetPerpMarkets, DevnetPerpMarkets } from '@drift-labs/sdk';
 
 /**
  * Get market index by asset symbol from the SDK's official market configurations
+ * This is the single source of truth - all other functions use this internally
  */
-export function getPerpMarketIndex(asset: string, isMainnet: boolean = true): number {
+export function getMarketIndex(asset: string, env: 'mainnet-beta' | 'devnet' = 'mainnet-beta'): number {
+  const isMainnet = env === 'mainnet-beta';
   const markets = isMainnet ? MainnetPerpMarkets : DevnetPerpMarkets;
 
   const market = markets.find(m =>
@@ -23,78 +25,38 @@ export function getPerpMarketIndex(asset: string, isMainnet: boolean = true): nu
 }
 
 /**
- * Market indices from Drift SDK for common assets
- * These match the official Drift Protocol market indices
+ * @deprecated Use getMarketIndex instead. Kept for backwards compatibility.
+ */
+export const getPerpMarketIndex = getMarketIndex;
+
+/**
+ * DRY-compliant market indices object - dynamically generated from SDK
+ * No more duplicate MAINNET/DEVNET objects with identical values!
  */
 export const PERP_MARKET_INDEX = {
-  // Mainnet indices
-  MAINNET: {
-    SOL: 0,
-    BTC: 1,
-    ETH: 2,
-    APT: 3,
-    BONK: 4,  // 1MBONK
-    POL: 5,
-    ARB: 6,
-    DOGE: 7,
-    BNB: 8,
-    SUI: 9,
-    PEPE: 10, // 1MPEPE
-    OP: 11,
-    RENDER: 12,
-    XRP: 13,
-    HNT: 14,
-    INJ: 15,
-    LINK: 16,
-    RLB: 17,
-    PYTH: 18,
-    TIA: 19,
-    JTO: 20,
+  get MAINNET() {
+    return this._createIndicesProxy('mainnet-beta');
   },
-  // Devnet indices (same as mainnet for major markets)
-  DEVNET: {
-    SOL: 0,
-    BTC: 1,
-    ETH: 2,
-    APT: 3,
-    BONK: 4,
-    POL: 5,
-    ARB: 6,
-    DOGE: 7,
-    BNB: 8,
-    SUI: 9,
-    PEPE: 10,
-    OP: 11,
-    RENDER: 12,
-    XRP: 13,
-    HNT: 14,
-    INJ: 15,
-    LINK: 16,
-    RLB: 17,
-    PYTH: 18,
-    TIA: 19,
-    JTO: 20,
+  get DEVNET() {
+    return this._createIndicesProxy('devnet');
+  },
+  _createIndicesProxy(env: 'mainnet-beta' | 'devnet') {
+    return new Proxy({} as Record<string, number>, {
+      get(target, prop) {
+        if (typeof prop === 'string') {
+          try {
+            return getMarketIndex(prop, env);
+          } catch {
+            return undefined;
+          }
+        }
+        return undefined;
+      }
+    });
   }
 } as const;
 
-/**
- * Get the correct market index based on environment and asset
- */
-export function getMarketIndex(asset: string, env: 'mainnet-beta' | 'devnet' = 'mainnet-beta'): number {
-  const isMainnet = env === 'mainnet-beta';
-  const indices = isMainnet ? PERP_MARKET_INDEX.MAINNET : PERP_MARKET_INDEX.DEVNET;
-
-  const upperAsset = asset.toUpperCase();
-
-  if (!(upperAsset in indices)) {
-    // Fallback to SDK lookup
-    return getPerpMarketIndex(asset, isMainnet);
-  }
-
-  return indices[upperAsset as keyof typeof indices];
-}
-
-// Export specific indices for backwards compatibility
-export const ETH_PERP_MARKET_INDEX_MAINNET = PERP_MARKET_INDEX.MAINNET.ETH;
-export const BTC_PERP_MARKET_INDEX_MAINNET = PERP_MARKET_INDEX.MAINNET.BTC;
-export const SOL_PERP_MARKET_INDEX_MAINNET = PERP_MARKET_INDEX.MAINNET.SOL;
+// Export specific indices for backwards compatibility - now DRY!
+export const ETH_PERP_MARKET_INDEX_MAINNET = getMarketIndex('ETH', 'mainnet-beta');
+export const BTC_PERP_MARKET_INDEX_MAINNET = getMarketIndex('BTC', 'mainnet-beta');
+export const SOL_PERP_MARKET_INDEX_MAINNET = getMarketIndex('SOL', 'mainnet-beta');
