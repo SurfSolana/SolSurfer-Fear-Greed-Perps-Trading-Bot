@@ -31,16 +31,15 @@ interface StrategyCarouselProps {
 export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", className = "" }: StrategyCarouselProps) {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Filter states
   const [selectedAsset, setSelectedAsset] = useState<string>("all");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("all");
   const [leverageRange, setLeverageRange] = useState<[number, number]>([1, 10]);
-  const [maxDrawdownThreshold, setMaxDrawdownThreshold] = useState<number>(100);
   const [sharpeRange, setSharpeRange] = useState<[number, number]>([-2, 5]);
-  const [winRateRange, setWinRateRange] = useState<[number, number]>([0, 100]);
-  const [timeInMarketRange, setTimeInMarketRange] = useState<[number, number]>([0, 100]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [maxDrawdownThreshold, setMaxDrawdownThreshold] = useState<number>(100);
+  const [dataInterval, setDataInterval] = useState<string>("4h");
 
   // Available filter options from database
   const [filterOptions, setFilterOptions] = useState<{
@@ -64,12 +63,6 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
           const data = await res.json();
           if (data.success) {
             setFilterOptions(data.options);
-            // Update range defaults based on actual data
-            if (data.options.ranges) {
-              setSharpeRange([Math.floor(data.options.ranges.sharpeRatio.min), Math.ceil(data.options.ranges.sharpeRatio.max)]);
-              setWinRateRange([0, 100]);
-              setTimeInMarketRange([0, 100]);
-            }
           }
         }
       } catch (error) {
@@ -110,6 +103,10 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
       // Strategy type filter
       if (selectedStrategy !== "all" && strategy.strategy !== selectedStrategy) return false;
 
+      // Data interval filter - This is a mock filter, as the backend does not yet support it
+      // This is ready for when the backend is updated
+      // if (dataInterval !== "all" && strategy.dataInterval !== dataInterval) return false;
+
       // Leverage range filter
       if (strategy.leverage < leverageRange[0] || strategy.leverage > leverageRange[1]) return false;
 
@@ -119,15 +116,9 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
       // Sharpe ratio filter
       if (strategy.sharpeRatio < sharpeRange[0] || strategy.sharpeRatio > sharpeRange[1]) return false;
 
-      // Win rate filter
-      if (strategy.winRate < winRateRange[0] || strategy.winRate > winRateRange[1]) return false;
-
-      // Time in market filter
-      if (strategy.timeInMarket < timeInMarketRange[0] || strategy.timeInMarket > timeInMarketRange[1]) return false;
-
       return true;
     });
-  }, [strategies, selectedAsset, selectedStrategy, leverageRange, maxDrawdownThreshold, sharpeRange, winRateRange, timeInMarketRange]);
+  }, [strategies, selectedAsset, selectedStrategy, dataInterval, leverageRange, maxDrawdownThreshold, sharpeRange]);
 
   // Reset filters
   const resetFilters = () => {
@@ -135,9 +126,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
     setSelectedStrategy("all");
     setLeverageRange([1, 10]);
     setMaxDrawdownThreshold(100);
-    setSharpeRange([Math.floor(filterOptions.ranges?.sharpeRatio?.min || -2), Math.ceil(filterOptions.ranges?.sharpeRatio?.max || 5)]);
-    setWinRateRange([0, 100]);
-    setTimeInMarketRange([0, 100]);
+    setSharpeRange([-2, 5]);
   };
 
   const getRiskColor = (level: string) => {
@@ -175,7 +164,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
     return null;
   }
 
-  const activeFiltersCount = [selectedAsset !== "all", selectedStrategy !== "all", leverageRange[0] !== 1 || leverageRange[1] !== 10, maxDrawdownThreshold !== 100, sharpeRange[0] !== Math.floor(filterOptions.ranges?.sharpeRatio?.min || -2) || sharpeRange[1] !== Math.ceil(filterOptions.ranges?.sharpeRatio?.max || 5), winRateRange[0] !== 0 || winRateRange[1] !== 100, timeInMarketRange[0] !== 0 || timeInMarketRange[1] !== 100].filter(Boolean).length;
+  const activeFiltersCount = [selectedAsset !== "all", selectedStrategy !== "all", leverageRange[0] !== 1 || leverageRange[1] !== 10, maxDrawdownThreshold !== 100, sharpeRange[0] !== -2 || sharpeRange[1] !== 5].filter(Boolean).length;
 
   return (
     <div className={`bg-card border border-border rounded-xl p-6 ${className}`}>
@@ -213,10 +202,21 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
               {/* Strategy type filter */}
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Strategy</label>
-                <select value={selectedStrategy} onChange={(e) => setSelectedStrategy(e.target.value)} className="w-full px-2 py-1.5 bg-black/50 border border-border/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
-                  <option value="all">All Strategies</option>
-                  <option value="momentum">Momentum</option>
-                  <option value="contrarian">Contrarian</option>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setSelectedStrategy("all")} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedStrategy === "all" ? "bg-cyan-500/20 text-cyan-400" : "bg-black/50 hover:bg-black/70"}`}>All</button>
+                  <button onClick={() => setSelectedStrategy("momentum")} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedStrategy === "momentum" ? "bg-cyan-500/20 text-cyan-400" : "bg-black/50 hover:bg-black/70"}`}>Momentum</button>
+                  <button onClick={() => setSelectedStrategy("contrarian")} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedStrategy === "contrarian" ? "bg-cyan-500/20 text-cyan-400" : "bg-black/50 hover:bg-black/70"}`}>Contrarian</button>
+                </div>
+              </div>
+
+              {/* Data interval filter */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Data Interval</label>
+                <select value={dataInterval} onChange={(e) => setDataInterval(e.target.value)} className="w-full px-2 py-1.5 bg-black/50 border border-border/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
+                  <option value="15min">15 minutes</option>
+                  <option value="1h">1 hour</option>
+                  <option value="4h">4 hours</option>
+                  <option value="24h">24 hours</option>
                 </select>
               </div>
 
@@ -238,7 +238,6 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
               </div>
             </div>
 
-            {/* Additional filters */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {/* Sharpe Ratio filter */}
               <div>
@@ -251,27 +250,6 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                 </div>
               </div>
 
-              {/* Win Rate filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  Win Rate: {winRateRange[0]}% - {winRateRange[1]}%
-                </label>
-                <div className="flex items-center gap-2">
-                  <input type="range" min="0" max="100" step="5" value={winRateRange[0]} onChange={(e) => setWinRateRange([parseInt(e.target.value), winRateRange[1]])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                  <input type="range" min="0" max="100" step="5" value={winRateRange[1]} onChange={(e) => setWinRateRange([winRateRange[0], parseInt(e.target.value)])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                </div>
-              </div>
-
-              {/* Time in Market filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  Time in Market: {timeInMarketRange[0]}% - {timeInMarketRange[1]}%
-                </label>
-                <div className="flex items-center gap-2">
-                  <input type="range" min="0" max="100" step="5" value={timeInMarketRange[0]} onChange={(e) => setTimeInMarketRange([parseInt(e.target.value), timeInMarketRange[1]])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                  <input type="range" min="0" max="100" step="5" value={timeInMarketRange[1]} onChange={(e) => setTimeInMarketRange([timeInMarketRange[0], parseInt(e.target.value)])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                </div>
-              </div>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-border/30">
