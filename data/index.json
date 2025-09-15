@@ -1,0 +1,44 @@
+{
+  "description": "Master data catalog for Lifeguard Token Vault",
+  "structure": {
+    "performance": {
+      "path": "./performance/",
+      "description": "Daily trading performance logs",
+      "files": [
+        "daily-performance-2025-09-07.json",
+        "daily-performance-2025-09-08.json",
+        "daily-performance-2025-09-09.json",
+        "daily-performance-2025-09-10.json",
+        "daily-performance-2025-09-11.json",
+        "daily-performance-2025-09-12.json",
+        "daily-performance-2025-09-13.json"
+      ]
+    },
+    "current_state": {
+      "path": "./current-state/",
+      "description": "Current trading bot state",
+      "files": [
+        "fgi-drift-state-v2.json"
+      ]
+    },
+    "backtests": {
+      "path": "./backtests/",
+      "description": "Comprehensive backtest results",
+      "catalog": "./backtests/index.json",
+      "total_files": 4262,
+      "organized_results": 6,
+      "archive_files": 4256
+    }
+  },
+  "statistics": {
+    "total_json_files": 4270,
+    "performance_logs": 7,
+    "state_files": 1,
+    "backtest_results": 4262
+  },
+  "notes": {
+    "reorganization_date": "2025-09-14",
+    "purpose": "Eliminated architectural confusion by organizing scattered data",
+    "previous_state": "Files scattered across root and multiple directories"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@surfsolana/solsurfer-fear-greed-perps-trading-bot",
+  "version": "1.0.0",
+  "description": "FGI Trading Bot for Drift Protocol",
+  "scripts": {
+    "start": "tsx drift-fgi-trader-v2.ts",
+    "trade": "tsx drift-fgi-trader-v2.ts",
+    "trade:force-long": "tsx drift-fgi-trader-v2.ts force-long",
+    "trade:force-short": "tsx drift-fgi-trader-v2.ts force-short",
+    "trade:close": "tsx drift-fgi-trader-v2.ts close",
+    "trade:status": "tsx drift-fgi-trader-v2.ts status",
+    "test": "tsx tests/test-suite.ts",
+    "test:fgi": "tsx tests/test-fgi.ts",
+    "backtest": "tsx backtesting/backtest-fgi-momentum-optimized.ts",
+    "backtest:monthly": "tsx backtesting/backtest-monthly.ts",
+    "devnet:setup": "bash scripts/devnet/initialize-devnet.sh",
+    "devnet:fund": "tsx scripts/devnet/get-devnet-usdc.ts",
+    "devnet:test": "tsx scripts/devnet/test-devnet-connection.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.61.0",
+    "@coral-xyz/anchor": "^0.31.1",
+    "@drift-labs/sdk": "^2.136.0",
+    "@drift-labs/vaults-sdk": "^0.9.130",
+    "@metaplex-foundation/js": "^0.20.1",
+    "@solana-agent-kit/plugin-defi": "^2.0.7",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "chalk": "^5.6.2",
+    "decimal.js": "^10.6.0",
+    "dotenv": "^17.2.2",
+    "solana-agent-kit": "^2.0.9"
+  }
+}

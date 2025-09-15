@@ -1,0 +1,8 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="64" fill="#3b82f6"/>
+  <path d="M128 256L192 192L320 320L448 192" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="160" cy="350" r="20" fill="white"/>
+  <circle cx="240" cy="300" r="16" fill="white"/>
+  <circle cx="320" cy="380" r="18" fill="white"/>
+  <text x="256" y="450" font-family="Arial, sans-serif" font-size="48" font-weight="bold" text-anchor="middle" fill="white">W</text>
+</svg>
