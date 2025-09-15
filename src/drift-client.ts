@@ -19,11 +19,12 @@ import {
   PostOnlyParams,
   convertToNumber,
   DriftEnv,
-  UserAccount
+  UserAccount,
+  MainnetPerpMarkets,
+  DevnetPerpMarkets
 } from '@drift-labs/sdk';
 import bs58 from 'bs58';
 import chalk from 'chalk';
-import { getMarketIndex } from './market-constants';
 
 /**
  * 🔒 LOCKED by @docs-agent | Change to 🔑 to allow @docs-agent edits
@@ -50,10 +51,10 @@ export const DRIFT_CONFIG = {
   AUTO_CREATE_SUBACCOUNT: process.env.DRIFT_AUTO_CREATE_SUBACCOUNT !== 'false', // Auto-create if doesn't exist
   SUBACCOUNT_NAME: process.env.DRIFT_SUBACCOUNT_NAME || 'Trading Bot Account',
 
-  // Market indices - from SDK's official market configurations
-  ETH_PERP_MARKET_INDEX: getMarketIndex('ETH', (process.env.DRIFT_ENV || 'mainnet-beta') as any),
-  BTC_PERP_MARKET_INDEX: getMarketIndex('BTC', (process.env.DRIFT_ENV || 'mainnet-beta') as any),
-  SOL_PERP_MARKET_INDEX: getMarketIndex('SOL', (process.env.DRIFT_ENV || 'mainnet-beta') as any),
+  // Market indices - directly from SDK arrays
+  ETH_PERP_MARKET_INDEX: MainnetPerpMarkets[2].marketIndex,  // ETH is at index 2
+  BTC_PERP_MARKET_INDEX: MainnetPerpMarkets[1].marketIndex,  // BTC is at index 1
+  SOL_PERP_MARKET_INDEX: MainnetPerpMarkets[0].marketIndex,  // SOL is at index 0
 
   // Connection settings
   RPC_ENDPOINTS: {
