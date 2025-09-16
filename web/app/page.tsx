@@ -157,7 +157,7 @@ export default function TradingDashboard() {
           maxPositionRatio: 1.0, // Use 100% of available collateral
           strategy: parameters.strategy || 'momentum',
           enabled: botStatus.isActive,
-          timeframe: parameters.dataInterval || '4h'
+          timeframe: dataInterval || '4h'
         })
       })
 
@@ -187,6 +187,10 @@ export default function TradingDashboard() {
       />
 
       <main className="pt-16 container mx-auto px-4 py-6 space-y-6">
+        {/* Header action row */}
+        <div className="flex justify-end">
+          <a href="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+        </div>
         {/* Big number controls with carousel inside */}
         <BigNumberControls
           parameters={parameters}
