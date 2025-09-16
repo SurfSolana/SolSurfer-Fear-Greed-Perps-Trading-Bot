@@ -1,120 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
+import { handleApiError, createSuccessResponse } from '../../lib/error-handler'
+
+const execAsync = promisify(exec)
+
+// Helper function to check PM2 process status using CLI
+async function checkPM2Process(name: string): Promise<any | null> {
+  try {
+    const { stdout } = await execAsync('pm2 jlist')
+    const processes = JSON.parse(stdout)
+    const process = processes.find((p: any) => p.name === name)
+    return process || null
+  } catch (error) {
+    console.error('Failed to check PM2 process:', error)
+    return null
+  }
+}
 
 export async function POST(request: NextRequest) {
-  try {
-    // Check if bot is already running
-    const pidPath = path.join(process.cwd(), '..', 'bot.pid')
-    if (fs.existsSync(pidPath)) {
-      try {
-        const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim())
-        process.kill(pid, 0) // Check if process exists
-        return NextResponse.json(
-          { success: false, error: 'Trading bot is already running' },
-          { status: 409 }
-        )
-      } catch (error) {
-        // Process not running, clean up stale PID file
-        fs.unlinkSync(pidPath)
-      }
-    }
+  let requestContext: any = {}
 
+  try {
+    // Parse request body
     const body = await request.json().catch(() => ({}))
-    const { asset = 'ETH', lowThreshold = 49, highThreshold = 50, leverage = 4, strategy = 'fgi' } = body
+    requestContext = { body, method: 'POST', endpoint: '/api/bot/start' }
+
+    // Check if bot is already running via PM2
+    const existingProcess = await checkPM2Process('drift-fgi-trader')
+    if (existingProcess && existingProcess.pm2_env?.status === 'online') {
+      const error = new Error('Trading bot is already running')
+      ;(error as any).status = 409
+      throw error
+    }
+    const {
+      asset = 'ETH',
+      lowThreshold = 25,
+      highThreshold = 75,
+      leverage = 4,
+      strategy = 'momentum',
+      timeframe = '4h',
+      maxPositionRatio = 1.0
+    } = body
+
+    requestContext.params = { asset, lowThreshold, highThreshold, leverage, strategy, timeframe, maxPositionRatio }
 
     // Validate input parameters
     if (leverage < 1 || leverage > 10) {
-      return NextResponse.json(
-        { success: false, error: 'Leverage must be between 1 and 10' },
-        { status: 400 }
-      )
+      throw new Error('Leverage must be between 1 and 10')
     }
 
     if (lowThreshold < 0 || lowThreshold > 100 || highThreshold < 0 || highThreshold > 100) {
-      return NextResponse.json(
-        { success: false, error: 'Thresholds must be between 0 and 100' },
-        { status: 400 }
-      )
+      throw new Error('Thresholds must be between 0 and 100')
     }
 
-    // Update configuration file
-    const configPath = path.join(process.cwd(), '..', '.env')
-    if (!fs.existsSync(configPath)) {
-      return NextResponse.json(
-        { success: false, error: 'Configuration file not found' },
-        { status: 500 }
-      )
+    if (lowThreshold >= highThreshold) {
+      throw new Error('Low threshold must be less than high threshold')
     }
 
-    const envContent = fs.readFileSync(configPath, 'utf-8')
-    
-    // Update relevant environment variables - the bot uses hardcoded thresholds
-    // so we mainly need to update leverage for now
-    let updatedEnv = envContent
-      .replace(/^LEVERAGE=.*/m, `LEVERAGE=${leverage}`)
-    
-    // If the leverage line doesn't exist, add it
-    if (!envContent.includes('LEVERAGE=')) {
-      updatedEnv += `\nLEVERAGE=${leverage}\n`
-    }
-    
-    fs.writeFileSync(configPath, updatedEnv)
-
-    // Start the bot process with 'service' command
-    const botPath = path.join(process.cwd(), '..', 'drift-fgi-trader-v2.ts')
-    const child = spawn('bun', ['run', botPath, 'service'], {
-      cwd: path.join(process.cwd(), '..'),
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'] // Capture output for debugging
-    })
-
-    child.unref()
-
-    // Save process ID for later management
-    fs.writeFileSync(pidPath, child.pid!.toString())
-
-    // Log startup in the background
-    if (child.stdout) {
-      child.stdout.on('data', (data) => {
-        console.log(`Bot output: ${data}`)
-      })
-    }
-    
-    if (child.stderr) {
-      child.stderr.on('data', (data) => {
-        console.error(`Bot error: ${data}`)
-      })
+    // Write complete configuration to shared JSON file for hot-reload
+    const configPath = path.join(process.cwd(), '..', 'data', 'trading-config.json')
+    const config = {
+      asset,
+      leverage,
+      lowThreshold,
+      highThreshold,
+      strategy,
+      enabled: true,
+      timeframe,
+      maxPositionRatio,
+      updatedAt: new Date().toISOString()
     }
 
-    child.on('exit', (code) => {
-      console.log(`Bot process exited with code ${code}`)
-      // Clean up PID file if process exits
-      try {
-        if (fs.existsSync(pidPath)) {
-          fs.unlinkSync(pidPath)
-        }
-      } catch (error) {
-        console.error('Failed to clean up PID file:', error)
+    // Ensure data directory exists
+    const dataDir = path.join(process.cwd(), '..', 'data')
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true })
+    }
+
+    // Write configuration with proper formatting
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
+    console.log('Configuration written to:', configPath, config)
+
+    // Start or restart bot via PM2 CLI
+    const scriptPath = path.join(process.cwd(), '..', 'drift-fgi-trader-v2.ts')
+
+    try {
+      if (existingProcess) {
+        // Restart the existing process
+        await execAsync('pm2 restart drift-fgi-trader')
+        console.log('Bot restarted successfully via PM2')
+        return createSuccessResponse(
+          { config, restarted: true },
+          'Trading bot restarted successfully'
+        )
+      } else {
+        // Start new process
+        const startCommand = `pm2 start ${scriptPath} --name drift-fgi-trader --interpreter bun -- service`
+        await execAsync(startCommand, { cwd: path.join(process.cwd(), '..') })
+        console.log('Bot started successfully via PM2')
+        return createSuccessResponse(
+          { config, started: true },
+          'Trading bot started successfully'
+        )
       }
-    })
+    } catch (startError: any) {
+      throw new Error(`Failed to start/restart bot: ${startError.message}`)
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      pid: child.pid,
-      message: 'Trading bot started successfully in service mode',
-      config: {
-        asset,
-        leverage,
-        strategy: 'FGI (Fear & Greed Index)'
-      }
-    })
-  } catch (error) {
-    console.error('Failed to start bot:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to start trading bot' },
-      { status: 500 }
-    )
+  } catch (error: any) {
+    return handleApiError('/api/bot/start', error, requestContext)
   }
 }
