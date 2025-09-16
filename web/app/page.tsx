@@ -11,9 +11,12 @@ import { BacktestEquityChart } from '@/components/backtest-equity-chart'
 
 interface RollingEquityPoint {
   timestamp: string
+  price: number
   balance: number
   pnl: number
   drawdown: number
+  fgi: number
+  score: number
 }
 
 interface RollingSummary {
@@ -26,6 +29,20 @@ interface RollingSummary {
   winRate: number
   periodStart: string
   periodEnd: string
+}
+
+interface RollingTradeSummary {
+  direction: 'long' | 'short'
+  entryTimestamp: string
+  exitTimestamp?: string
+  entryPrice: number
+  exitPrice?: number
+  entryFgi: number
+  exitFgi?: number
+  pnl?: number
+  returnPct?: number
+  leverage: number
+  durationMinutes?: number
 }
 
 export default function TradingDashboard() {
@@ -102,6 +119,7 @@ export default function TradingDashboard() {
   const [backtestResult, setBacktestResult] = useState<any>(null)
   const [rollingSummary, setRollingSummary] = useState<RollingSummary | null>(null)
   const [rollingCurve, setRollingCurve] = useState<RollingEquityPoint[]>([])
+  const [rollingTrades, setRollingTrades] = useState<RollingTradeSummary[]>([])
   const [rollingLoading, setRollingLoading] = useState(false)
   const [rollingError, setRollingError] = useState<string | null>(null)
 
@@ -231,11 +249,13 @@ export default function TradingDashboard() {
 
       setRollingSummary(json.data.summary || null)
       setRollingCurve(json.data.equityCurve || [])
+      setRollingTrades(json.data.trades || [])
     } catch (error: any) {
       console.error('Rolling backtest failed:', error)
       setRollingError(error?.message || 'Failed to run backtest')
       setRollingSummary(null)
       setRollingCurve([])
+      setRollingTrades([])
     } finally {
       setRollingLoading(false)
     }
@@ -306,6 +326,12 @@ export default function TradingDashboard() {
             data={rollingCurve}
             summary={rollingSummary || undefined}
             loading={rollingLoading}
+            trades={rollingTrades}
+            thresholds={{
+              low: parameters.lowThreshold ?? 25,
+              high: parameters.highThreshold ?? 75
+            }}
+            strategy={(parameters.strategy as 'momentum' | 'contrarian') || 'momentum'}
           />
         </div>
 

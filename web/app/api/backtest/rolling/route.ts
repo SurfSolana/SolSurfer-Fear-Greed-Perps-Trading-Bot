@@ -23,9 +23,12 @@ interface HistoricalPoint {
 
 interface EquityPoint {
   timestamp: string
+  price: number
   balance: number
   pnl: number
   drawdown: number
+  fgi: number
+  score: number
 }
 
 interface TradeSummary {
@@ -117,19 +120,32 @@ async function fetchHistoricalPoints(asset: Asset, timeframe: Timeframe): Promis
     throw new Error('Unexpected data format from historical API')
   }
 
-  const points: HistoricalPoint[] = records
-    .map(entry => {
-      const timestampRaw = entry.timestamp || entry.date
-      const price = Number(entry.price ?? entry.close ?? entry.raw?.price)
-      const fgi = Number(entry.fgi ?? entry.cfgi ?? entry.raw?.cfgi ?? entry.value)
-      const timestamp = new Date(timestampRaw).toISOString()
-      if (!timestampRaw || !Number.isFinite(price) || !Number.isFinite(fgi)) {
-        return null
-      }
-      return { timestamp, price, fgi }
-    })
-    .filter((point): point is HistoricalPoint => point !== null)
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  const points: HistoricalPoint[] = []
+  let lastPrice: number | null = null
+  let lastFgi: number | null = null
+
+  for (const entry of records) {
+    const timestampRaw = entry.timestamp || entry.date
+    if (!timestampRaw) continue
+
+    const parsedPrice = Number(entry.price ?? entry.close ?? entry.raw?.price)
+    const parsedFgi = Number(entry.fgi ?? entry.cfgi ?? entry.raw?.cfgi ?? entry.value)
+    const timestamp = new Date(timestampRaw).toISOString()
+
+    const price = Number.isFinite(parsedPrice) ? parsedPrice : lastPrice
+    const fgi = Number.isFinite(parsedFgi) ? parsedFgi : lastFgi
+
+    if (!Number.isFinite(price) || !Number.isFinite(fgi)) {
+      continue
+    }
+
+    lastPrice = price
+    lastFgi = fgi
+
+    points.push({ timestamp, price, fgi })
+  }
+
+  points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
   if (points.length < 2) {
     throw new Error('Insufficient data to run backtest')
@@ -215,13 +231,11 @@ function runSimulation(points: HistoricalPoint[], params: ReturnType<typeof norm
     const isLastPoint = index === points.length - 1
 
     if (activeTrade) {
-      const shouldExit = desired === null || desired !== activeTrade.direction
-      if (shouldExit) {
+      if (desired && desired !== activeTrade.direction) {
         closeTrade(point, timestampMs)
+        openTrade(desired, point, timestampMs)
       }
-    }
-
-    if (!activeTrade && desired) {
+    } else if (desired) {
       openTrade(desired, point, timestampMs)
     }
 
@@ -245,11 +259,17 @@ function runSimulation(points: HistoricalPoint[], params: ReturnType<typeof norm
     const drawdown = peakEquity > 0 ? ((peakEquity - equity) / peakEquity) * 100 : 0
     maxDrawdown = Math.max(maxDrawdown, drawdown)
 
+    const priceRounded = Number(point.price.toFixed(2))
+    const fgiRounded = Number(point.fgi.toFixed(2))
+
     equityCurve.push({
       timestamp: point.timestamp,
+      price: priceRounded,
       balance: equity,
       pnl: Number((equity - STARTING_BALANCE).toFixed(2)),
-      drawdown: Number(drawdown.toFixed(2))
+      drawdown: Number(drawdown.toFixed(2)),
+      fgi: fgiRounded,
+      score: fgiRounded
     })
   })
 
