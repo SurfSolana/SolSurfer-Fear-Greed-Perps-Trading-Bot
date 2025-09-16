@@ -1,0 +1,11 @@
+{
+  "asset": "ETH",
+  "leverage": 8,
+  "lowThreshold": 49,
+  "highThreshold": 50,
+  "maxPositionRatio": 1,
+  "strategy": "contrarian",
+  "enabled": true,
+  "timeframe": "4h",
+  "updatedAt": "2025-09-16T00:26:45.000Z"
+}

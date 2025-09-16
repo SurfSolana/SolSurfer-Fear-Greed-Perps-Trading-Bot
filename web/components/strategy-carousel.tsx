@@ -8,7 +8,8 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 interface Strategy {
   asset: string;
   strategy: string;
-  fgiThreshold: number;
+  shortThreshold: number;
+  longThreshold: number;
   leverage: number;
   totalReturn: number;
   monthlyReturn: number;
@@ -31,13 +32,11 @@ interface StrategyCarouselProps {
 export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", className = "" }: StrategyCarouselProps) {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
 
   // Filter states
   const [selectedAsset, setSelectedAsset] = useState<string>("all");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("all");
-  const [leverageRange, setLeverageRange] = useState<[number, number]>([1, 10]);
-  const [sharpeRange, setSharpeRange] = useState<[number, number]>([-2, 5]);
+  const [selectedLeverage, setSelectedLeverage] = useState<string>("all");
   const [maxDrawdownThreshold, setMaxDrawdownThreshold] = useState<number>(100);
   const [dataInterval, setDataInterval] = useState<string>("4h");
 
@@ -46,11 +45,13 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
     assets: string[];
     strategies: string[];
     leverages: number[];
+    thresholdRanges: { short: number; long: number }[];
     ranges: any;
   }>({
     assets: [],
     strategies: [],
     leverages: [],
+    thresholdRanges: [],
     ranges: {},
   });
 
@@ -107,26 +108,22 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
       // This is ready for when the backend is updated
       // if (dataInterval !== "all" && strategy.dataInterval !== dataInterval) return false;
 
-      // Leverage range filter
-      if (strategy.leverage < leverageRange[0] || strategy.leverage > leverageRange[1]) return false;
+      // Leverage filter
+      if (selectedLeverage !== "all" && strategy.leverage !== parseInt(selectedLeverage)) return false;
 
       // Max drawdown filter
       if (Math.abs(strategy.maxDrawdown) > maxDrawdownThreshold) return false;
 
-      // Sharpe ratio filter
-      if (strategy.sharpeRatio < sharpeRange[0] || strategy.sharpeRatio > sharpeRange[1]) return false;
-
       return true;
     });
-  }, [strategies, selectedAsset, selectedStrategy, dataInterval, leverageRange, maxDrawdownThreshold, sharpeRange]);
+  }, [strategies, selectedAsset, selectedStrategy, dataInterval, selectedLeverage, maxDrawdownThreshold]);
 
   // Reset filters
   const resetFilters = () => {
     setSelectedAsset("all");
     setSelectedStrategy("all");
-    setLeverageRange([1, 10]);
+    setSelectedLeverage("all");
     setMaxDrawdownThreshold(100);
-    setSharpeRange([-2, 5]);
   };
 
   const getRiskColor = (level: string) => {
@@ -164,7 +161,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
     return null;
   }
 
-  const activeFiltersCount = [selectedAsset !== "all", selectedStrategy !== "all", leverageRange[0] !== 1 || leverageRange[1] !== 10, maxDrawdownThreshold !== 100, sharpeRange[0] !== -2 || sharpeRange[1] !== 5].filter(Boolean).length;
+  const activeFiltersCount = [selectedAsset !== "all", selectedStrategy !== "all", selectedLeverage !== "all", maxDrawdownThreshold !== 100].filter(Boolean).length;
 
   return (
     <div className={`bg-card border border-border rounded-xl p-6 ${className}`}>
@@ -174,16 +171,38 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
             <h2 className="text-lg font-semibold text-white mb-1">Top Performing Strategies</h2>
             <p className="text-sm text-muted-foreground">Based on historical backtest data</p>
           </div>
-          <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/30 border border-border/50 hover:bg-black/50 transition-colors text-sm">
-            <Filter className="w-4 h-4" />
-            <span>Filters</span>
-            {activeFiltersCount > 0 && <span className="ml-1 px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full text-xs font-medium">{activeFiltersCount}</span>}
-          </button>
+          {activeFiltersCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm">
+              <Filter className="w-4 h-4" />
+              <span>{activeFiltersCount} Active Filter{activeFiltersCount > 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
 
         {/* Filter controls */}
-        {showFilters && (
-          <div className="bg-black/30 border border-border/50 rounded-lg p-4 space-y-4">
+        <div className="bg-black/30 border border-border/50 rounded-lg p-4 space-y-4">
+            {/* Ranges info card */}
+            {filterOptions.thresholdRanges.length > 0 && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <div className="text-blue-400 mt-0.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-blue-300 mb-1">Why don't filters change results?</div>
+                    <div className="text-xs text-blue-200/80">
+                      Backtests were run with specific FGI threshold ranges: {filterOptions.thresholdRanges.slice(0, 3).map((r) => 
+                        `${r.short}-${r.long}`
+                      ).join(', ')}{filterOptions.thresholdRanges.length > 3 && `, and ${filterOptions.thresholdRanges.length - 3} more`}.
+                      The system tests these exact combinations, not every possible value.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Primary filters */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {/* Asset filter */}
@@ -220,15 +239,22 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                 </select>
               </div>
 
-              {/* Leverage range filter */}
+              {/* Leverage filter */}
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  Leverage: {leverageRange[0]}x - {leverageRange[1]}x
-                </label>
-                <div className="flex items-center gap-2">
-                  <input type="range" min="1" max="10" value={leverageRange[0]} onChange={(e) => setLeverageRange([parseInt(e.target.value), leverageRange[1]])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                  <input type="range" min="1" max="10" value={leverageRange[1]} onChange={(e) => setLeverageRange([leverageRange[0], parseInt(e.target.value)])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                </div>
+                <label className="text-xs text-muted-foreground mb-1 block">Leverage</label>
+                <select value={selectedLeverage} onChange={(e) => setSelectedLeverage(e.target.value)} className="w-full px-2 py-1.5 bg-black/50 border border-border/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
+                  <option value="all">All Leverage</option>
+                  <option value="1">1x</option>
+                  <option value="2">2x</option>
+                  <option value="3">3x</option>
+                  <option value="4">4x</option>
+                  <option value="5">5x</option>
+                  <option value="6">6x</option>
+                  <option value="7">7x</option>
+                  <option value="8">8x</option>
+                  <option value="9">9x</option>
+                  <option value="10">10x</option>
+                </select>
               </div>
 
               {/* Max drawdown filter */}
@@ -238,19 +264,6 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {/* Sharpe Ratio filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  Sharpe: {sharpeRange[0]} to {sharpeRange[1]}
-                </label>
-                <div className="flex items-center gap-2">
-                  <input type="range" min={Math.floor(filterOptions.ranges?.sharpeRatio?.min || -2)} max={Math.ceil(filterOptions.ranges?.sharpeRatio?.max || 5)} step="0.5" value={sharpeRange[0]} onChange={(e) => setSharpeRange([parseFloat(e.target.value), sharpeRange[1]])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                  <input type="range" min={Math.floor(filterOptions.ranges?.sharpeRatio?.min || -2)} max={Math.ceil(filterOptions.ranges?.sharpeRatio?.max || 5)} step="0.5" value={sharpeRange[1]} onChange={(e) => setSharpeRange([sharpeRange[0], parseFloat(e.target.value)])} className="flex-1 h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-                </div>
-              </div>
-
-            </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-border/30">
               <div className="text-xs text-muted-foreground">
@@ -263,8 +276,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                 </button>
               )}
             </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {filteredStrategies.length === 0 ? (
@@ -305,19 +317,32 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                           <span className="capitalize">{strategy.strategy}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs">
-                        <div className="flex w-full gap-3">
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">FGI:</span>
-                            <span className="font-mono font-semibold text-cyan-400">{strategy.fgiThreshold}</span>
+                      <div className="space-y-2">
+                        {/* Strategy type and thresholds */}
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium capitalize text-cyan-400">
+                            {strategy.strategy}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">Lev:</span>
+                          <div className={`px-1.5 whitespace-nowrap py-0.5 rounded text-xs font-medium ${getRiskColor(strategy.riskLevel)}`}>
+                            {strategy.riskLevel.toUpperCase().replace("-", " ")} RISK
+                          </div>
+                        </div>
+                        
+                        {/* FGI Thresholds */}
+                        <div className="bg-black/50 rounded p-2 space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Short below:</span>
+                            <span className="font-mono font-semibold text-red-400">{strategy.shortThreshold}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Long above:</span>
+                            <span className="font-mono font-semibold text-green-400">{strategy.longThreshold}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Leverage:</span>
                             <span className="font-mono font-semibold text-fuchsia-400">{strategy.leverage}x</span>
                           </div>
                         </div>
-
-                        <div className={`px-1.5 whitespace-nowrap py-0.5 rounded text-xs font-medium ${getRiskColor(strategy.riskLevel)}`}>{strategy.riskLevel.toUpperCase().replace("-", " ")} RISK</div>
                       </div>
                     </div>
 

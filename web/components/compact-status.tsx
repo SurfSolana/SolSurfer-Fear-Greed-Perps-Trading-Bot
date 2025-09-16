@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { TradingStatus, TradingParameters } from '@/lib/types'
 import { Circle, Play, Square, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { ConfirmationDialog } from './confirmation-dialog'
 
 interface CompactStatusProps {
   botStatus?: TradingStatus
@@ -31,6 +33,8 @@ export function CompactStatus({
   onSave,
 }: CompactStatusProps) {
   const isActive = botStatus?.isActive || false
+  const [showStartConfirm, setShowStartConfirm] = useState(false)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
   const formatPnL = (pnl: number) => {
     const sign = pnl >= 0 ? '+' : ''
     return `${sign}${pnl.toFixed(2)}`
@@ -61,10 +65,20 @@ export function CompactStatus({
 
   const handleToggle = () => {
     if (isActive) {
-      onStop()
+      setShowStopConfirm(true)
     } else {
-      onStart()
+      setShowStartConfirm(true)
     }
+  }
+
+  const confirmStart = () => {
+    setShowStartConfirm(false)
+    onStart()
+  }
+
+  const confirmStop = () => {
+    setShowStopConfirm(false)
+    onStop()
   }
 
   return (
@@ -174,6 +188,29 @@ export function CompactStatus({
 
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={showStartConfirm}
+        title="Start Trading Bot"
+        message={`Are you sure you want to start the trading bot with ${parameters.leverage}x leverage? The bot will begin trading automatically using the ${parameters.strategy} strategy.`}
+        onConfirm={confirmStart}
+        onCancel={() => setShowStartConfirm(false)}
+        confirmText="Start Trading"
+        cancelText="Cancel"
+        variant="info"
+      />
+
+      <ConfirmationDialog
+        isOpen={showStopConfirm}
+        title="Stop Trading Bot"
+        message="Are you sure you want to stop the trading bot? Any open positions will be closed automatically."
+        onConfirm={confirmStop}
+        onCancel={() => setShowStopConfirm(false)}
+        confirmText="Stop Trading"
+        cancelText="Keep Running"
+        variant="danger"
+      />
     </div>
   )
 }

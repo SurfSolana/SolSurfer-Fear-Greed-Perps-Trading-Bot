@@ -5,7 +5,8 @@ import path from 'path';
 interface StrategyResult {
   asset: string;
   strategy: string;
-  fgiThreshold: number;
+  shortThreshold: number;
+  longThreshold: number;
   leverage: number;
   totalReturn: number;
   monthlyReturn: number;
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
       SELECT
         asset,
         strategy,
-        short_threshold as fgiThreshold,
+        short_threshold as shortThreshold,
+        long_threshold as longThreshold,
         leverage,
         total_return as totalReturn,
         total_return / 3 as monthlyReturn,

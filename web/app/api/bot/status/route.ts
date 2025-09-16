@@ -1,12 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
+import { handleApiError } from '../../lib/error-handler'
+
+const execAsync = promisify(exec)
+
+// Helper function to check PM2 process status using CLI
+async function checkPM2Process(name: string): Promise<any | null> {
+  try {
+    const { stdout, stderr } = await execAsync('pm2 jlist')
+    if (stderr) {
+      console.error('PM2 jlist stderr:', stderr)
+    }
+    const processes = JSON.parse(stdout)
+    console.log(`Found ${processes.length} PM2 processes`)
+    const process = processes.find((p: any) => p.name === name)
+    if (process) {
+      console.log(`Found process ${name}:`, { pid: process.pid, status: process.pm2_env?.status })
+    } else {
+      console.log(`Process ${name} not found in:`, processes.map((p: any) => p.name))
+    }
+    return process || null
+  } catch (error: any) {
+    console.error('Failed to check PM2 process:', error.message, error.stack)
+    return null
+  }
+}
 
 export async function GET(request: NextRequest) {
+  const requestContext = { method: 'GET', endpoint: '/api/bot/status' }
+
   try {
     // Read state file
     const statePath = path.join(process.cwd(), '..', 'data', 'current-state', 'fgi-drift-state-v2.json')
-    const fgiDataPath = path.join(process.cwd(), '..', 'current-fgi.json')
+    const configPath = path.join(process.cwd(), '..', 'data', 'trading-config.json')
     
     let state = {
       hasOpenPosition: false,
@@ -25,26 +54,15 @@ export async function GET(request: NextRequest) {
       state = { ...state, ...savedState }
     }
 
-    // Check if bot is running
-    const pidPath = path.join(process.cwd(), '..', 'bot.pid')
-    let isRunning = false
-    
-    if (fs.existsSync(pidPath)) {
-      try {
-        const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim())
-        // Check if process is actually running
-        process.kill(pid, 0) // This throws if process doesn't exist
-        isRunning = true
-      } catch (error) {
-        // Process not running, clean up stale PID file
-        try {
-          fs.unlinkSync(pidPath)
-        } catch (cleanupError) {
-          console.error('Failed to clean up stale PID file:', cleanupError)
-        }
-        isRunning = false
-      }
-    }
+    // Check if bot is running via PM2
+    const botProcess = await checkPM2Process('drift-fgi-trader')
+    console.log('Bot process check:', { found: botProcess !== null, status: botProcess?.pm2_env?.status })
+
+    const isRunning = botProcess !== null && botProcess.pm2_env?.status === 'online'
+    const botUptime = botProcess?.pm2_env?.pm_uptime || 0
+    const botRestarts = botProcess?.pm2_env?.restart_time || 0
+    const botCpu = botProcess?.monit?.cpu || 0
+    const botMemory = botProcess?.monit?.memory ? (botProcess.monit.memory / 1024 / 1024).toFixed(1) : 0
 
     // Get current FGI
     let currentFGI = 50
@@ -92,6 +110,26 @@ export async function GET(request: NextRequest) {
       balance = performance.currentBalance || balance
     }
 
+    // Read current configuration
+    let config = {
+      leverage: 4,
+      lowThreshold: 25,
+      highThreshold: 75,
+      strategy: 'momentum',
+      timeframe: '4h',
+      asset: 'ETH'
+    }
+
+    if (fs.existsSync(configPath)) {
+      try {
+        const configContent = fs.readFileSync(configPath, 'utf-8')
+        const savedConfig = JSON.parse(configContent)
+        config = { ...config, ...savedConfig }
+      } catch (error) {
+        console.error('Failed to read trading config:', error)
+      }
+    }
+
     return NextResponse.json({
       isRunning,
       position: state.hasOpenPosition ? state.direction : 'NEUTRAL',
@@ -101,20 +139,35 @@ export async function GET(request: NextRequest) {
       currentPrice,
       currentFGI,
       lastUpdate: new Date().toISOString(),
-      balance
+      balance,
+      // PM2 specific metrics
+      uptime: botUptime,
+      restarts: botRestarts,
+      cpu: botCpu,
+      memory: `${botMemory} MB`,
+      // Current configuration
+      config
     })
-  } catch (error) {
-    console.error('Failed to get status:', error)
-    return NextResponse.json(
-      { 
-        isRunning: false,
-        position: 'NEUTRAL',
-        currentPnL: 0,
-        currentPnLPercent: 0,
-        currentFGI: 50,
-        lastUpdate: new Date().toISOString(),
-        balance: 10000
-      }
-    )
+  } catch (error: any) {
+    // For status endpoint, we want to return a degraded response rather than error
+    // This ensures the UI continues to work even if there are issues
+    console.error('[/api/bot/status] Error:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    })
+
+    // Return default status response for UI stability
+    return NextResponse.json({
+      isRunning: false,
+      position: 'NEUTRAL',
+      currentPnL: 0,
+      currentPnLPercent: 0,
+      currentFGI: 50,
+      lastUpdate: new Date().toISOString(),
+      balance: 10000,
+      error: 'Unable to fetch complete status',
+      degraded: true
+    })
   }
 }

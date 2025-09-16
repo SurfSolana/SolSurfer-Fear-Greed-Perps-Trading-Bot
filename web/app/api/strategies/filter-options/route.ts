@@ -11,6 +11,9 @@ export async function GET() {
     const assets = db.prepare('SELECT DISTINCT asset FROM backtests ORDER BY asset').all()
     const strategies = db.prepare('SELECT DISTINCT strategy FROM backtests ORDER BY strategy').all()
     const leverages = db.prepare('SELECT DISTINCT leverage FROM backtests ORDER BY leverage').all()
+    
+    // Get distinct threshold combinations
+    const thresholdRanges = db.prepare('SELECT DISTINCT short_threshold, long_threshold FROM backtests ORDER BY short_threshold, long_threshold').all()
 
     // Get min/max values for range filters
     const ranges = db.prepare(`
@@ -42,6 +45,10 @@ export async function GET() {
         assets: assets.map((r: any) => r.asset),
         strategies: strategies.map((r: any) => r.strategy),
         leverages: leverages.map((r: any) => r.leverage).sort((a: number, b: number) => a - b),
+        thresholdRanges: thresholdRanges.map((r: any) => ({
+          short: r.short_threshold,
+          long: r.long_threshold
+        })),
         ranges: {
           sharpeRatio: { min: ranges.minSharpe, max: ranges.maxSharpe },
           drawdown: { min: Math.abs(ranges.maxDrawdown), max: Math.abs(ranges.minDrawdown) },
