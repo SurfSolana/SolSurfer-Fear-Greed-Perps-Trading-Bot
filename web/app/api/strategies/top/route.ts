@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '10');
     const sortBy = searchParams.get('sortBy') || 'totalReturn'; // totalReturn, sharpeRatio, monthlyReturn
+    const asset = searchParams.get('asset'); // optional: SOL | ETH | BTC
 
     // Connect to SQLite database
     const dbPath = path.join(process.cwd(), '..', 'backtesting', 'backtest-results', 'all-backtests.db');
@@ -43,6 +44,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Query top performing strategies from all assets
+    const where = asset && asset !== 'all' ? 'WHERE asset = ?' : ''
+    const params: any[] = []
+    if (where) params.push(asset)
+    params.push(limit)
+
     const query = `
       SELECT
         asset,
@@ -59,14 +65,16 @@ export async function GET(request: NextRequest) {
         time_in_market as timeInMarket,
         liquidations
       FROM backtests
+      ${where}
       ORDER BY ${orderByColumn} DESC
       LIMIT ?
     `;
 
-    const strategies = db.prepare(query).all(limit) as StrategyResult[];
+    const strategies = db.prepare(query).all(...params) as StrategyResult[];
 
     // Get total count for metadata
-    const countResult = db.prepare('SELECT COUNT(*) as count FROM backtests').get() as {count: number};
+  const countQuery = `SELECT COUNT(*) as count FROM backtests ${where}`
+  const countResult = db.prepare(countQuery).get(where ? asset : undefined) as {count: number};
 
     db.close();
 

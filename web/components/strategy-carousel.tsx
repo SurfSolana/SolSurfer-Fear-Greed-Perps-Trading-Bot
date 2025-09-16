@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import NumberFlow from "@number-flow/react";
-import { TrendingUp, AlertTriangle, Zap, Target, Filter, X } from "lucide-react";
+import { TrendingUp, AlertTriangle, Zap, Target, Filter } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import FilterBar from "@/components/ui/filter-bar";
 
 interface Strategy {
   asset: string;
@@ -34,7 +35,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter states
-  const [selectedAsset, setSelectedAsset] = useState<string>("all");
+  const [selectedAsset, setSelectedAsset] = useState<string>(currentAsset || "all");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("all");
   const [selectedLeverage, setSelectedLeverage] = useState<string>("all");
   const [maxDrawdownThreshold, setMaxDrawdownThreshold] = useState<number>(100);
@@ -78,7 +79,9 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
   useEffect(() => {
     const fetchStrategies = async () => {
       try {
-        const res = await fetch("/api/strategies/top?limit=50&sortBy=totalReturn");
+        const params = new URLSearchParams({ limit: '50', sortBy: 'totalReturn' })
+        if (selectedAsset && selectedAsset !== 'all') params.set('asset', selectedAsset)
+        const res = await fetch(`/api/strategies/top?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
           if (data.success) {
@@ -93,7 +96,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
     };
 
     fetchStrategies();
-  }, []);
+  }, [selectedAsset]);
 
   // Filter strategies based on current filters
   const filteredStrategies = useMemo(() => {
@@ -117,6 +120,84 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
       return true;
     });
   }, [strategies, selectedAsset, selectedStrategy, dataInterval, selectedLeverage, maxDrawdownThreshold]);
+
+  // Group by displayed totalReturn (1 decimal) per asset+strategy
+  const grouped = useMemo(() => {
+    type Group = {
+      key: string
+      representative: Strategy
+      items: Strategy[]
+      roundedTotal: number
+      // precomputed param sets
+      shorts: number[]
+      longs: number[]
+      levs: number[]
+      minShort: number
+      maxShort: number
+      minLong: number
+      maxLong: number
+      minLev: number
+      maxLev: number
+    }
+
+    const map = new Map<string, Group>()
+    for (const s of filteredStrategies) {
+      const rounded = Number(s.totalReturn.toFixed(1))
+      const key = `${s.asset}|${s.strategy}|${rounded}`
+      const g = map.get(key)
+      if (!g) {
+        map.set(key, {
+          key,
+          representative: s,
+          items: [s],
+          roundedTotal: rounded,
+          shorts: [s.shortThreshold],
+          longs: [s.longThreshold],
+          levs: [s.leverage],
+          minShort: s.shortThreshold,
+          maxShort: s.shortThreshold,
+          minLong: s.longThreshold,
+          maxLong: s.longThreshold,
+          minLev: s.leverage,
+          maxLev: s.leverage,
+        })
+      } else {
+        g.items.push(s)
+        // collect distincts
+        if (!g.shorts.includes(s.shortThreshold)) g.shorts.push(s.shortThreshold)
+        if (!g.longs.includes(s.longThreshold)) g.longs.push(s.longThreshold)
+        if (!g.levs.includes(s.leverage)) g.levs.push(s.leverage)
+        // update ranges
+        g.minShort = Math.min(g.minShort, s.shortThreshold)
+        g.maxShort = Math.max(g.maxShort, s.shortThreshold)
+        g.minLong = Math.min(g.minLong, s.longThreshold)
+        g.maxLong = Math.max(g.maxLong, s.longThreshold)
+        g.minLev = Math.min(g.minLev, s.leverage)
+        g.maxLev = Math.max(g.maxLev, s.leverage)
+      }
+    }
+
+    // maintain original ordering by representative in filtered list
+    const order = new Map<string, number>()
+    filteredStrategies.forEach((s, idx) => {
+      const rounded = Number(s.totalReturn.toFixed(1))
+      const key = `${s.asset}|${s.strategy}|${rounded}`
+      if (!order.has(key)) order.set(key, idx)
+    })
+
+    return Array.from(map.values()).sort((a, b) => (order.get(a.key)! - order.get(b.key)!))
+  }, [filteredStrategies])
+
+  // Utility to present a compact param value or range
+  function renderValueOrRange(values: number[], min: number, max: number, suffix = '') {
+    const distinct = [...values].sort((a,b)=>a-b)
+    if (distinct.length === 1) return <span className="font-mono font-semibold">{distinct[0]}{suffix}</span>
+    // If 5 or fewer distinct values, list them; else show range
+    if (distinct.length <= 5) {
+      return <span className="font-mono font-semibold">{distinct.join(', ')}{suffix}</span>
+    }
+    return <span className="font-mono font-semibold">{min}–{max}{suffix}</span>
+  }
 
   // Reset filters
   const resetFilters = () => {
@@ -180,106 +261,26 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
         </div>
 
         {/* Filter controls */}
-        <div className="bg-black/30 border border-border/50 rounded-lg p-4 space-y-4">
-            {/* Ranges info card */}
-            {filterOptions.thresholdRanges.length > 0 && (
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
-                <div className="flex items-start gap-2">
-                  <div className="text-blue-400 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-blue-300 mb-1">Why don't filters change results?</div>
-                    <div className="text-xs text-blue-200/80">
-                      Backtests were run with specific FGI threshold ranges: {filterOptions.thresholdRanges.slice(0, 3).map((r) => 
-                        `${r.short}-${r.long}`
-                      ).join(', ')}{filterOptions.thresholdRanges.length > 3 && `, and ${filterOptions.thresholdRanges.length - 3} more`}.
-                      The system tests these exact combinations, not every possible value.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Primary filters */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Asset filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Token</label>
-                <select value={selectedAsset} onChange={(e) => setSelectedAsset(e.target.value)} className="w-full px-2 py-1.5 bg-black/50 border border-border/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
-                  <option value="all">All Tokens</option>
-                  {filterOptions.assets.map((asset) => (
-                    <option key={asset} value={asset}>
-                      {asset}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Strategy type filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Strategy</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setSelectedStrategy("all")} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedStrategy === "all" ? "bg-cyan-500/20 text-cyan-400" : "bg-black/50 hover:bg-black/70"}`}>All</button>
-                  <button onClick={() => setSelectedStrategy("momentum")} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedStrategy === "momentum" ? "bg-cyan-500/20 text-cyan-400" : "bg-black/50 hover:bg-black/70"}`}>Momentum</button>
-                  <button onClick={() => setSelectedStrategy("contrarian")} className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${selectedStrategy === "contrarian" ? "bg-cyan-500/20 text-cyan-400" : "bg-black/50 hover:bg-black/70"}`}>Contrarian</button>
-                </div>
-              </div>
-
-              {/* Data interval filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Data Interval</label>
-                <select value={dataInterval} onChange={(e) => setDataInterval(e.target.value)} className="w-full px-2 py-1.5 bg-black/50 border border-border/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
-                  <option value="15min">15 minutes</option>
-                  <option value="1h">1 hour</option>
-                  <option value="4h">4 hours</option>
-                  <option value="24h">24 hours</option>
-                </select>
-              </div>
-
-              {/* Leverage filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Leverage</label>
-                <select value={selectedLeverage} onChange={(e) => setSelectedLeverage(e.target.value)} className="w-full px-2 py-1.5 bg-black/50 border border-border/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/50">
-                  <option value="all">All Leverage</option>
-                  <option value="1">1x</option>
-                  <option value="2">2x</option>
-                  <option value="3">3x</option>
-                  <option value="4">4x</option>
-                  <option value="5">5x</option>
-                  <option value="6">6x</option>
-                  <option value="7">7x</option>
-                  <option value="8">8x</option>
-                  <option value="9">9x</option>
-                  <option value="10">10x</option>
-                </select>
-              </div>
-
-              {/* Max drawdown filter */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Max DD: &lt; {maxDrawdownThreshold}%</label>
-                <input type="range" min="10" max="100" step="5" value={maxDrawdownThreshold} onChange={(e) => setMaxDrawdownThreshold(parseInt(e.target.value))} className="w-full h-1.5 bg-black/50 rounded-lg appearance-none cursor-pointer slider-thumb" />
-              </div>
-            </div>
-
-
-            <div className="flex items-center justify-between pt-2 border-t border-border/30">
-              <div className="text-xs text-muted-foreground">
-                Showing {filteredStrategies.length} of {strategies.length} strategies
-              </div>
-              {activeFiltersCount > 0 && (
-                <button onClick={resetFilters} className="flex items-center gap-1 px-2 py-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
-                  <X className="w-3 h-3" />
-                  Clear filters
-                </button>
-              )}
-            </div>
-        </div>
+        <FilterBar
+          className=""
+          assets={filterOptions.assets.length ? filterOptions.assets : ["ETH","BTC","SOL"]}
+          strategies={["momentum", "contrarian"]}
+          leverages={filterOptions.leverages.length ? filterOptions.leverages : [1,2,3,4,5,6,7,8,9,10]}
+          selectedAsset={selectedAsset}
+          selectedStrategy={selectedStrategy}
+          selectedLeverage={selectedLeverage}
+          maxDrawdownThreshold={maxDrawdownThreshold}
+          totalCount={strategies.length}
+          filteredCount={filteredStrategies.length}
+          onChangeAsset={setSelectedAsset}
+          onChangeStrategy={setSelectedStrategy}
+          onChangeLeverage={setSelectedLeverage}
+          onChangeMaxDrawdown={setMaxDrawdownThreshold}
+          onReset={resetFilters}
+        />
       </div>
 
-      {filteredStrategies.length === 0 ? (
+      {grouped.length === 0 ? (
         <div className="flex items-center justify-center h-32 text-muted-foreground">
           <div className="text-center">
             <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -298,8 +299,11 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
           className="w-full"
         >
           <CarouselContent className="-ml-2 md:-ml-4">
-            {filteredStrategies.map((strategy, index) => (
-              <CarouselItem key={index} className="pl-2 md:pl-4 md:basis-1/3">
+            {grouped.map((group, index) => {
+              const strategy = group.representative
+              const variantCount = group.items.length
+              return (
+              <CarouselItem key={group.key + index} className="pl-2 md:pl-4 md:basis-1/3">
                 <div className={`bg-black/30 rounded-lg p-4 border ${strategy.isRecommended ? "border-green-400/30" : "border-border/50"} h-full relative`}>
                   {strategy.isRecommended && (
                     <div className="absolute top-2 right-2">
@@ -315,6 +319,11 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           {getStrategyIcon(strategy.strategy)}
                           <span className="capitalize">{strategy.strategy}</span>
+                          {variantCount > 1 && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-400/15 text-cyan-300">
+                              {variantCount} variants
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -328,19 +337,19 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                           </div>
                         </div>
                         
-                        {/* FGI Thresholds */}
+                        {/* FGI Thresholds / Parameter variants */}
                         <div className="bg-black/50 rounded p-2 space-y-1">
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-muted-foreground">Short below:</span>
-                            <span className="font-mono font-semibold text-red-400">{strategy.shortThreshold}</span>
+                            <span className="text-red-400">{renderValueOrRange(group.shorts, group.minShort, group.maxShort)}</span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-muted-foreground">Long above:</span>
-                            <span className="font-mono font-semibold text-green-400">{strategy.longThreshold}</span>
+                            <span className="text-green-400">{renderValueOrRange(group.longs, group.minLong, group.maxLong)}</span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-muted-foreground">Leverage:</span>
-                            <span className="font-mono font-semibold text-fuchsia-400">{strategy.leverage}x</span>
+                            <span className="text-fuchsia-400">{renderValueOrRange(group.levs, group.minLev, group.maxLev, 'x')}</span>
                           </div>
                         </div>
                       </div>
@@ -350,8 +359,8 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                     <div className="flex-1 space-y-3">
                       <div>
                         <div className="text-xs text-muted-foreground mb-0.5">Total Return</div>
-                        <div className={`text-2xl font-bold font-mono ${strategy.totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
-                          <NumberFlow value={strategy.totalReturn} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
+                        <div className={`text-2xl font-bold font-mono ${group.roundedTotal >= 0 ? "text-green-400" : "text-red-400"}`}>
+                          <NumberFlow value={group.roundedTotal} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
                         </div>
                       </div>
 
@@ -412,7 +421,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                   </div>
                 </div>
               </CarouselItem>
-            ))}
+              )})}
           </CarouselContent>
           <CarouselPrevious className="-left-12 bg-black/50 border-border/50 hover:bg-black/70 text-white" />
           <CarouselNext className="-right-12 bg-black/50 border-border/50 hover:bg-black/70 text-white" />
