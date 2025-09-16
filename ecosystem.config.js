@@ -9,12 +9,6 @@ module.exports = {
         SOLANA_PRIVATE_KEY: process.env.SOLANA_PRIVATE_KEY,
         USE_DRIFT_SDK: 'true'
       }
-    },
-    {
-      name: 'fgi-web-ui',
-      script: 'bun',
-      args: 'run dev',
-      cwd: './web',
     }
   ]
 }
