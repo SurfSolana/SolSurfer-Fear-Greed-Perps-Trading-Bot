@@ -1,8 +1,8 @@
 {
   "asset": "ETH",
-  "leverage": 8,
-  "lowThreshold": 49,
-  "highThreshold": 50,
+  "leverage": 10,
+  "lowThreshold": 37,
+  "highThreshold": 63,
   "maxPositionRatio": 1,
   "strategy": "contrarian",
   "enabled": true,
