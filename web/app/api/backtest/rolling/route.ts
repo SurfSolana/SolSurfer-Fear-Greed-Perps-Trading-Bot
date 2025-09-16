@@ -132,8 +132,8 @@ async function fetchHistoricalPoints(asset: Asset, timeframe: Timeframe): Promis
     const parsedFgi = Number(entry.fgi ?? entry.cfgi ?? entry.raw?.cfgi ?? entry.value)
     const timestamp = new Date(timestampRaw).toISOString()
 
-    const price = Number.isFinite(parsedPrice) ? parsedPrice : lastPrice
-    const fgi = Number.isFinite(parsedFgi) ? parsedFgi : lastFgi
+    const price: number = Number.isFinite(parsedPrice) ? parsedPrice : lastPrice
+    const fgi: number = Number.isFinite(parsedFgi) ? parsedFgi : lastFgi
 
     if (!Number.isFinite(price) || !Number.isFinite(fgi)) {
       continue

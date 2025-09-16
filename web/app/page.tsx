@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TradingParameters, TradingStatus } from '@/lib/types'
 import { CompactStatus } from '@/components/compact-status'
-import { FGITimeSeries, ViewWindow, DataInterval } from '@/components/fgi-time-series'
 import { BigNumberControls } from '@/components/big-number-controls'
 import { StrategyCarousel } from '@/components/strategy-carousel'
 import { Button } from '@/components/ui/button'
@@ -66,8 +65,7 @@ export default function TradingDashboard() {
   const [currentFGI, setCurrentFGI] = useState<number>(50)
   const [currentPnL, setCurrentPnL] = useState<number>(0)
   const [balance, setBalance] = useState<number | undefined>(undefined)
-  const [selectedViewWindow, setSelectedViewWindow] = useState<ViewWindow>('7days')
-  const [dataInterval, setDataInterval] = useState<DataInterval>('4h')
+  const [dataInterval, setDataInterval] = useState<'15min' | '1h' | '4h'>('4h')
 
   // Fetch current FGI
   const fetchFGI = useCallback(async () => {
@@ -218,7 +216,7 @@ export default function TradingDashboard() {
     setRollingLoading(true)
     setRollingError(null)
     try {
-      const timeframeMap: Record<DataInterval, string> = {
+      const timeframeMap: Record<'15min' | '1h' | '4h', string> = {
         '15min': '15min',
         '1h': '1h',
         '4h': '4h'
@@ -283,20 +281,6 @@ export default function TradingDashboard() {
           <a href="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Docs</a>
         </div>
 
-        {/* FGI graph with timeframe selector inside */}
-        <FGITimeSeries
-          currentFGI={currentFGI}
-          asset={parameters.asset || 'ETH'}
-          onAssetChange={(asset) => handleParametersChange({ ...parameters, asset })}
-          selectedViewWindow={selectedViewWindow}
-          onViewWindowChange={setSelectedViewWindow}
-          dataInterval={dataInterval}
-          onDataIntervalChange={setDataInterval}
-          thresholds={{
-            low: parameters.lowThreshold ?? 25,
-            high: parameters.highThreshold ?? 75
-          }}
-        />
 
         <div className="space-y-4 bg-card border border-border rounded-xl p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
