@@ -12,5 +12,19 @@
         "timestamp": "2025-09-15T23:20:37.664Z"
       }
     ]
+  },
+  "09/16": {
+    "date": "09/16",
+    "pnl": 0,
+    "trades": 1,
+    "winRate": 0,
+    "positions": [
+      {
+        "direction": "SHORT",
+        "size": 0.016262734480073617,
+        "pnl": 0,
+        "timestamp": "2025-09-16T05:00:49.124Z"
+      }
+    ]
   }
 }

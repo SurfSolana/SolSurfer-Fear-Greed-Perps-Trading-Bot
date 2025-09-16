@@ -136,10 +136,10 @@ export default function TradingDashboard() {
     // Apply the strategy parameters
     setParameters({
       ...parameters,
-      asset: strategy.asset,
+      asset: strategy.asset.replace('-PERP', ''), // Remove -PERP suffix if present
       strategy: strategy.strategy,
-      lowThreshold: strategy.strategy === 'momentum' ? strategy.fgiThreshold : 100 - strategy.fgiThreshold,
-      highThreshold: strategy.strategy === 'momentum' ? 100 - strategy.fgiThreshold : strategy.fgiThreshold,
+      lowThreshold: strategy.shortThreshold,
+      highThreshold: strategy.longThreshold,
       leverage: strategy.leverage
     })
   }, [parameters])

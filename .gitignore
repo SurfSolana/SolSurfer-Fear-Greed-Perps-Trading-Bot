@@ -49,6 +49,9 @@ logs/
 *.db-journal
 *.db-wal
 
+daily-performance.json
+fgi-drift-state-v2.json
+
 # Backtest results (keep structure but not data)
 backtesting/backtest-results/*.json
 backtesting/backtest-results/*.csv

@@ -30,12 +30,12 @@ interface StrategyCarouselProps {
   className?: string;
 }
 
-export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", className = "" }: StrategyCarouselProps) {
+export function StrategyCarousel({ onApplyStrategy, currentAsset, className = "" }: StrategyCarouselProps) {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter states
-  const [selectedAsset, setSelectedAsset] = useState<string>(currentAsset || "all");
+  const [selectedAsset, setSelectedAsset] = useState<string>("all");
   const [selectedStrategy, setSelectedStrategy] = useState<string>("all");
   const [selectedLeverage, setSelectedLeverage] = useState<string>("all");
   const [maxDrawdownThreshold, setMaxDrawdownThreshold] = useState<number>(100);

@@ -43,40 +43,74 @@ export async function GET(request: NextRequest) {
         orderByColumn = 'total_return';
     }
 
-    // Query top performing strategies from all assets
-  // Match base assets like ETH to asset values like 'ETH' or 'ETH-PERP'
-  const where = asset && asset !== 'all' ? 'WHERE UPPER(asset) LIKE ?' : ''
-  const params: any[] = []
-  const upperAsset = (asset || '').toUpperCase()
-  if (where) params.push(`${upperAsset}%`)
-    params.push(limit)
+    // Query top performing strategies - if no specific asset, get balanced mix from all
+    let strategies: StrategyResult[] = [];
 
-    const query = `
-      SELECT
-        asset,
-        strategy,
-        short_threshold as shortThreshold,
-        long_threshold as longThreshold,
-        leverage,
-        total_return as totalReturn,
-        total_return / 3 as monthlyReturn,
-        sharpe_ratio as sharpeRatio,
-        max_drawdown as maxDrawdown,
-        win_rate as winRate,
-        num_trades as totalTrades,
-        time_in_market as timeInMarket,
-        liquidations
-      FROM backtests
-      ${where}
-      ORDER BY ${orderByColumn} DESC
-      LIMIT ?
-    `;
+    if (asset && asset !== 'all') {
+      // Single asset query
+      const upperAsset = asset.toUpperCase();
+      const query = `
+        SELECT
+          asset,
+          strategy,
+          short_threshold as shortThreshold,
+          long_threshold as longThreshold,
+          leverage,
+          total_return as totalReturn,
+          total_return / 3 as monthlyReturn,
+          sharpe_ratio as sharpeRatio,
+          max_drawdown as maxDrawdown,
+          win_rate as winRate,
+          num_trades as totalTrades,
+          time_in_market as timeInMarket,
+          liquidations
+        FROM backtests
+        WHERE UPPER(asset) LIKE ?
+        ORDER BY ${orderByColumn} DESC
+        LIMIT ?
+      `;
+      strategies = db.prepare(query).all(`${upperAsset}%`, limit) as StrategyResult[];
+    } else {
+      // Get balanced mix from all assets
+      const perAsset = Math.ceil(limit / 3);
+      const assets = ['ETH', 'BTC', 'SOL'];
 
-    const strategies = db.prepare(query).all(...params) as StrategyResult[];
+      for (const a of assets) {
+        const query = `
+          SELECT
+            asset,
+            strategy,
+            short_threshold as shortThreshold,
+            long_threshold as longThreshold,
+            leverage,
+            total_return as totalReturn,
+            total_return / 3 as monthlyReturn,
+            sharpe_ratio as sharpeRatio,
+            max_drawdown as maxDrawdown,
+            win_rate as winRate,
+            num_trades as totalTrades,
+            time_in_market as timeInMarket,
+            liquidations
+          FROM backtests
+          WHERE asset = ?
+          ORDER BY ${orderByColumn} DESC
+          LIMIT ?
+        `;
+        const assetStrategies = db.prepare(query).all(a, perAsset) as StrategyResult[];
+        strategies.push(...assetStrategies);
+      }
+
+      // Sort combined results and take top N
+      strategies.sort((a, b) => b.totalReturn - a.totalReturn);
+      strategies = strategies.slice(0, limit);
+    }
 
     // Get total count for metadata
-  const countQuery = `SELECT COUNT(*) as count FROM backtests ${where}`
-  const countResult = db.prepare(countQuery).get(where ? `${upperAsset}%` : undefined) as {count: number};
+    const countQuery = asset && asset !== 'all'
+      ? `SELECT COUNT(*) as count FROM backtests WHERE UPPER(asset) LIKE ?`
+      : `SELECT COUNT(*) as count FROM backtests`;
+    const countParams: any[] = asset && asset !== 'all' ? [`${asset.toUpperCase()}%`] : [];
+    const countResult = db.prepare(countQuery).get(...countParams) as {count: number};
 
     db.close();
 
