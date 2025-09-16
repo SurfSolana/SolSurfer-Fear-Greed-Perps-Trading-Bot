@@ -75,12 +75,27 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
     fetchFilterOptions();
   }, []);
 
+  // Normalize asset options to base tickers (e.g., ETH from ETH-PERP)
+  const assetOptions = useMemo(() => {
+    const bases = new Set<string>()
+    for (const a of filterOptions.assets) {
+      const base = String(a || '').toUpperCase().split('-')[0]
+      if (base) bases.add(base)
+    }
+    const list = Array.from(bases)
+    if (list.length === 0) return ["ETH","BTC","SOL"]
+    // Keep a stable, expected order if present
+    const pref = ["ETH","BTC","SOL"]
+    const rest = list.filter(x => !pref.includes(x)).sort()
+    return pref.filter(x => list.includes(x)).concat(rest)
+  }, [filterOptions.assets])
+
   // Fetch top strategies
   useEffect(() => {
     const fetchStrategies = async () => {
       try {
-        const params = new URLSearchParams({ limit: '50', sortBy: 'totalReturn' })
-        if (selectedAsset && selectedAsset !== 'all') params.set('asset', selectedAsset)
+  const params = new URLSearchParams({ limit: '50', sortBy: 'totalReturn' })
+  if (selectedAsset && selectedAsset !== 'all') params.set('asset', selectedAsset.toUpperCase())
         const res = await fetch(`/api/strategies/top?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
@@ -263,7 +278,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
         {/* Filter controls */}
         <FilterBar
           className=""
-          assets={filterOptions.assets.length ? filterOptions.assets : ["ETH","BTC","SOL"]}
+          assets={assetOptions}
           strategies={["momentum", "contrarian"]}
           leverages={filterOptions.leverages.length ? filterOptions.leverages : [1,2,3,4,5,6,7,8,9,10]}
           selectedAsset={selectedAsset}
