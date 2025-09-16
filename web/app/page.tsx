@@ -1,13 +1,35 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TradingParameters, TradingStatus } from '@/lib/types'
 import { CompactStatus } from '@/components/compact-status'
 import { FGITimeSeries, ViewWindow, DataInterval } from '@/components/fgi-time-series'
 import { BigNumberControls } from '@/components/big-number-controls'
 import { StrategyCarousel } from '@/components/strategy-carousel'
+import { Button } from '@/components/ui/button'
+import { BacktestEquityChart } from '@/components/backtest-equity-chart'
+
+interface RollingEquityPoint {
+  timestamp: string
+  balance: number
+  pnl: number
+  drawdown: number
+}
+
+interface RollingSummary {
+  startBalance: number
+  endBalance: number
+  totalReturnPct: number
+  totalPnl: number
+  maxDrawdown: number
+  trades: number
+  winRate: number
+  periodStart: string
+  periodEnd: string
+}
 
 export default function TradingDashboard() {
+
   // Parameters and status
   const [parameters, setParameters] = useState<TradingParameters>({
     asset: 'ETH',
@@ -78,6 +100,10 @@ export default function TradingDashboard() {
   const [estimatedPnL, setEstimatedPnL] = useState(0)
   const [projectedBalance, setProjectedBalance] = useState(10000)
   const [backtestResult, setBacktestResult] = useState<any>(null)
+  const [rollingSummary, setRollingSummary] = useState<RollingSummary | null>(null)
+  const [rollingCurve, setRollingCurve] = useState<RollingEquityPoint[]>([])
+  const [rollingLoading, setRollingLoading] = useState(false)
+  const [rollingError, setRollingError] = useState<string | null>(null)
 
   const fetchEstimate = useCallback(async () => {
     try {
@@ -170,6 +196,51 @@ export default function TradingDashboard() {
     }
   }, [parameters, botStatus.isActive])
 
+  const handleRun30DayBacktest = useCallback(async () => {
+    setRollingLoading(true)
+    setRollingError(null)
+    try {
+      const timeframeMap: Record<DataInterval, string> = {
+        '15min': '15min',
+        '1h': '1h',
+        '4h': '4h'
+      }
+
+      const response = await fetch('/api/backtest/rolling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset: parameters.asset || 'ETH',
+          strategy: parameters.strategy || 'momentum',
+          lowThreshold: parameters.lowThreshold ?? 25,
+          highThreshold: parameters.highThreshold ?? 75,
+          leverage: parameters.leverage,
+          timeframe: timeframeMap[dataInterval]
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'Failed to run backtest')
+      }
+
+      const json = await response.json()
+      if (!json.success || !json.data) {
+        throw new Error(json.error || 'Backtest response incomplete')
+      }
+
+      setRollingSummary(json.data.summary || null)
+      setRollingCurve(json.data.equityCurve || [])
+    } catch (error: any) {
+      console.error('Rolling backtest failed:', error)
+      setRollingError(error?.message || 'Failed to run backtest')
+      setRollingSummary(null)
+      setRollingCurve([])
+    } finally {
+      setRollingLoading(false)
+    }
+  }, [parameters, dataInterval])
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Top status bar with integrated controls */}
@@ -191,6 +262,53 @@ export default function TradingDashboard() {
         <div className="flex justify-end">
           <a href="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Docs</a>
         </div>
+
+        {/* FGI graph with timeframe selector inside */}
+        <FGITimeSeries
+          currentFGI={currentFGI}
+          asset={parameters.asset || 'ETH'}
+          onAssetChange={(asset) => handleParametersChange({ ...parameters, asset })}
+          selectedViewWindow={selectedViewWindow}
+          onViewWindowChange={setSelectedViewWindow}
+          dataInterval={dataInterval}
+          onDataIntervalChange={setDataInterval}
+          thresholds={{
+            low: parameters.lowThreshold ?? 25,
+            high: parameters.highThreshold ?? 75
+          }}
+        />
+
+        <div className="space-y-4 bg-card border border-border rounded-xl p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">30 Day Backtest</h2>
+              {rollingSummary && (
+                <p className="text-xs text-muted-foreground">
+                  {new Date(rollingSummary.periodStart).toLocaleDateString()} — {new Date(rollingSummary.periodEnd).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <Button
+              onClick={handleRun30DayBacktest}
+              disabled={rollingLoading}
+              variant="default"
+              className="self-start md:self-auto"
+            >
+              {rollingLoading ? 'Running…' : 'Run 30 Day Backtest'}
+            </Button>
+          </div>
+          {rollingError && (
+            <div className="text-sm text-destructive">
+              {rollingError}
+            </div>
+          )}
+          <BacktestEquityChart
+            data={rollingCurve}
+            summary={rollingSummary || undefined}
+            loading={rollingLoading}
+          />
+        </div>
+
         {/* Big number controls with carousel inside */}
         <BigNumberControls
           parameters={parameters}
@@ -207,21 +325,6 @@ export default function TradingDashboard() {
             />
           </div>
         </BigNumberControls>
-
-        {/* FGI graph with timeframe selector inside */}
-        <FGITimeSeries
-          currentFGI={currentFGI}
-          asset={parameters.asset || 'ETH'}
-          onAssetChange={(asset) => handleParametersChange({ ...parameters, asset })}
-          selectedViewWindow={selectedViewWindow}
-          onViewWindowChange={setSelectedViewWindow}
-          dataInterval={dataInterval}
-          onDataIntervalChange={setDataInterval}
-          thresholds={{
-            low: parameters.lowThreshold ?? 25,
-            high: parameters.highThreshold ?? 75
-          }}
-        />
       </main>
     </div>
   )
