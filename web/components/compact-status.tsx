@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { TradingStatus, TradingParameters } from '@/lib/types'
-import { Circle, Play, Square, Save } from 'lucide-react'
+import { Circle, Play, Square, Save, TrendingUp, TrendingDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { ConfirmationDialog } from './confirmation-dialog'
@@ -35,9 +35,10 @@ export function CompactStatus({
   const isActive = botStatus?.isActive || false
   const [showStartConfirm, setShowStartConfirm] = useState(false)
   const [showStopConfirm, setShowStopConfirm] = useState(false)
+  
   const formatPnL = (pnl: number) => {
-    const sign = pnl >= 0 ? '+' : ''
-    return `${sign}${pnl.toFixed(2)}`
+    const sign = pnl >= 0 ? '+$' : '-$'
+    return `${sign}${Math.abs(pnl).toFixed(2)}`
   }
 
   const formatCurrency = (amount?: number) => {
@@ -50,11 +51,11 @@ export function CompactStatus({
   }
 
   const getFGIStatus = (value: number) => {
-    if (value <= 25) return { label: 'EXTREME FEAR', color: 'text-destructive' }
-    if (value <= 45) return { label: 'FEAR', color: 'text-orange-500' }
-    if (value <= 55) return { label: 'NEUTRAL', color: 'text-muted-foreground' }
-    if (value <= 75) return { label: 'GREED', color: 'text-yellow-500' }
-    return { label: 'EXTREME GREED', color: 'text-destructive' }
+    if (value <= 25) return { label: 'EXTREME FEAR', color: 'text-red-400' }
+    if (value <= 45) return { label: 'FEAR', color: 'text-orange-400' }
+    if (value <= 55) return { label: 'NEUTRAL', color: 'text-gray-400' }
+    if (value <= 75) return { label: 'GREED', color: 'text-yellow-400' }
+    return { label: 'EXTREME GREED', color: 'text-green-400' }
   }
 
   const fgiStatus = getFGIStatus(fgiValue)
@@ -82,111 +83,98 @@ export function CompactStatus({
   }
 
   return (
-    <div className={`bg-background/80 backdrop-blur-lg border-b border-border ${className}`}>
-      <div className="container mx-auto px-4 py-2">
-        <div className="flex items-center justify-between gap-4">
+    <div className={`bg-gray-900/50 rounded-2xl p-6 shadow-xl backdrop-blur-sm ${className}`}>
+      <div className="flex items-center justify-between gap-8">
 
-          {/* Bot Status & Controls */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Circle
-                className={`w-2 h-2 fill-current ${
-                  isActive ? 'text-primary animate-pulse' : 'text-muted-foreground'
-                }`}
-              />
-              <span className="text-sm font-mono font-medium">
-                {isActive ? 'ACTIVE' : 'INACTIVE'}
-              </span>
-            </div>
-
-            {/* Start/Stop Button */}
-            <Button
-              onClick={handleToggle}
-              size="sm"
-              className={`h-8 px-4 font-semibold ${
-                isActive
-                  ? 'bg-destructive hover:bg-destructive/80 text-destructive-foreground'
-                  : 'bg-primary hover:bg-primary/80 text-primary-foreground'
+        {/* Bot Status & Controls */}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Circle
+              className={`w-3 h-3 fill-current ${
+                isActive ? 'text-primary animate-pulse' : 'text-muted-foreground'
               }`}
-            >
-              {isActive ? (
-                <>
-                  <Square className="w-3 h-3 mr-1" />
-                  STOP
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3 mr-1" />
-                  START
-                </>
-              )}
-            </Button>
-
-            {/* Save Settings Button */}
-            {onSave && (
-              <Button
-                onClick={onSave}
-                size="sm"
-                variant="outline"
-                className="h-8 px-4 font-semibold"
-              >
-                <Save className="w-3 h-3 mr-1" />
-                SAVE
-              </Button>
-            )}
-
-            {/* Leverage Slider */}
-            <div className="hidden md:flex items-center gap-2 ml-4">
-              <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                Leverage:
-              </span>
-              <div className="relative w-24">
-                <Slider
-                  value={[parameters.leverage]}
-                  onValueChange={handleLeverageChange}
-                  min={1}
-                  max={20}
-                  step={1}
-                  className="w-full [&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary [&_.relative]:bg-muted [&_[data-orientation]]:bg-primary"
-                />
-              </div>
-              <span className="text-sm font-mono font-bold text-primary">{parameters.leverage}x</span>
-            </div>
+            />
+            <span className="text-md font-mono font-medium">
+              {isActive ? 'ACTIVE' : 'INACTIVE'}
+            </span>
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-6">
-            {/* Current P&L */}
+          {/* Start/Stop Button - Primary CTA with proper prominence */}
+          <Button
+            onClick={handleToggle}
+            size="lg"
+            className={`h-12 px-8 font-bold text-lg transition-all ${
+              isActive
+                ? 'bg-destructive hover:bg-destructive/90 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl hover:-translate-y-0.5 animate-pulse'
+            }`}
+          >
+            {isActive ? (
+              <>
+                <Square className="w-5 h-5 mr-3" />
+                STOP BOT
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 mr-3" />
+                START BOT
+              </>
+            )}
+          </Button>
+
+          {/* Save Settings Button - Secondary action */}
+          {onSave && (
+            <Button
+              onClick={onSave}
+              size="sm"
+              variant="outline"
+              className="h-9 px-4 font-medium text-sm opacity-80 hover:opacity-100 border-gray-700 hover:border-gray-500 transition-all duration-150"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Config
+            </Button>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-10">
+          {/* Current P&L - PRIMARY METRIC */}
+          <div className="text-center">
+            <div className="text-sm text-gray-400 font-mono uppercase tracking-widest mb-1">P&L</div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">P&L</span>
-              <span className={`font-mono font-bold ${
-                currentPnL >= 0 ? 'text-primary' : 'text-destructive'
+              {currentPnL >= 0 ? (
+                <TrendingUp className="w-6 h-6 text-green-400" />
+              ) : (
+                <TrendingDown className="w-6 h-6 text-red-400" />
+              )}
+              <span className={`text-3xl font-mono font-bold ${
+                currentPnL >= 0 ? 'text-green-400' : 'text-red-400'
               }`}>
                 {formatPnL(currentPnL)}
               </span>
             </div>
-
-            {/* Balance */}
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Balance</span>
-              <span className="font-mono font-bold text-foreground">
-                {formatCurrency(balance)}
-              </span>
-            </div>
-
-            {/* FGI Value */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">FGI</span>
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-foreground">{fgiValue}</span>
-                <span className={`text-xs font-mono ${fgiStatus.color}`}>
-                  {fgiStatus.label}
-                </span>
-              </div>
-            </div>
           </div>
 
+          {/* Balance - SECONDARY METRIC */}
+          <div className="text-center">
+            <div className="text-sm text-gray-400 font-mono uppercase tracking-widest mb-1">Balance</div>
+            <span className="text-2xl font-mono font-semibold text-gray-200">
+              {formatCurrency(balance)}
+            </span>
+          </div>
+
+          {/* FGI Value - TERTIARY METRIC */}
+          <div className="text-center">
+            <div className="text-sm text-gray-400 font-mono uppercase tracking-widest mb-1">FGI</div>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-mono font-medium text-gray-300">{fgiValue}</span>
+              <span className={`text-sm font-mono opacity-80 ${fgiStatus.color}`}>
+                {fgiStatus.label}
+              </span>
+            </div>
+          </div>
         </div>
+
       </div>
 
       {/* Confirmation Dialogs */}

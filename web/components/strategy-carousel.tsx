@@ -245,9 +245,9 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
 
   if (isLoading) {
     return (
-      <div className={`bg-card border border-border rounded-xl p-8 ${className}`}>
+      <div className={`bg-gray-900/30 rounded-2xl p-8 ${className}`}>
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading top strategies...</div>
+          <div className="text-gray-500 animate-pulse">Loading top strategies...</div>
         </div>
       </div>
     );
@@ -260,12 +260,12 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
   const activeFiltersCount = [selectedAsset !== "all", selectedStrategy !== "all", selectedLeverage !== "all", maxDrawdownThreshold !== 100].filter(Boolean).length;
 
   return (
-    <div className={`bg-card border border-border rounded-xl p-6 ${className}`}>
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className={`bg-gray-900/30 rounded-2xl p-8 ${className}`}>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold text-white mb-1">Top Performing Strategies</h2>
-            <p className="text-sm text-muted-foreground">Based on historical backtest data</p>
+            <h2 className="text-xl font-bold text-gray-100">Top Strategies</h2>
+            <p className="text-xs text-gray-500 mt-1">Historical backtest performance</p>
           </div>
           {activeFiltersCount > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm">
@@ -319,7 +319,7 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
               const variantCount = group.items.length
               return (
               <CarouselItem key={group.key + index} className="pl-2 md:pl-4 md:basis-1/3">
-                <div className={`bg-black/30 rounded-lg p-4 border ${strategy.isRecommended ? "border-green-400/30" : "border-border/50"} h-full relative`}>
+                <div className={`bg-black/20 rounded-xl p-5 ${strategy.isRecommended ? "ring-1 ring-green-400/30" : ""} h-full relative shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-black/30`}>
                   {strategy.isRecommended && (
                     <div className="absolute top-2 right-2">
                       <span className="px-2 py-0.5 text-xs font-medium bg-green-400/20 text-green-400 rounded-full">REC</span>
@@ -327,94 +327,94 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                   )}
 
                   <div className="flex flex-col h-full">
-                    {/* Header: Asset & Strategy */}
-                    <div className="mb-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xl font-bold text-white">{strategy.asset}</span>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {getStrategyIcon(strategy.strategy)}
-                          <span className="capitalize">{strategy.strategy}</span>
-                          {variantCount > 1 && (
-                            <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-400/15 text-cyan-300">
-                              {variantCount} variants
-                            </span>
-                          )}
+                    {/* Simplified Header */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl font-bold text-white">{strategy.asset}</span>
+                          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-900/30">
+                            {getStrategyIcon(strategy.strategy)}
+                            <span className="text-xs font-medium text-cyan-400 capitalize">{strategy.strategy}</span>
+                          </div>
                         </div>
+                        {variantCount > 1 && (
+                          <span className="text-[10px] font-medium text-gray-500">
+                            {variantCount} variants
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-2">
-                        {/* Strategy type and thresholds */}
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium capitalize text-cyan-400">
-                            {strategy.strategy}
-                          </div>
-                          <div className={`px-1.5 whitespace-nowrap py-0.5 rounded text-xs font-medium ${getRiskColor(strategy.riskLevel)}`}>
-                            {strategy.riskLevel.toUpperCase().replace("-", " ")} RISK
+                        {/* Risk Badge */}
+                        <div className="flex justify-end mb-3">
+                          <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getRiskColor(strategy.riskLevel)}`}>
+                            {strategy.riskLevel.toUpperCase().replace("-", " ")}
                           </div>
                         </div>
-                        
-                        {/* FGI Thresholds / Parameter variants */}
-                        <div className="bg-black/50 rounded p-2 space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground">Short below:</span>
-                            <span className="text-red-400">{renderValueOrRange(group.shorts, group.minShort, group.maxShort)}</span>
+
+                        {/* Simplified Parameters */}
+                        <div className="bg-gray-900/50 rounded-lg p-3 space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-gray-600">Short</span>
+                            <span className="text-xs text-red-400 font-mono">&lt; {renderValueOrRange(group.shorts, group.minShort, group.maxShort)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground">Long above:</span>
-                            <span className="text-green-400">{renderValueOrRange(group.longs, group.minLong, group.maxLong)}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-gray-600">Long</span>
+                            <span className="text-xs text-green-400 font-mono">&gt; {renderValueOrRange(group.longs, group.minLong, group.maxLong)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground">Leverage:</span>
-                            <span className="text-fuchsia-400">{renderValueOrRange(group.levs, group.minLev, group.maxLev, 'x')}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-gray-600">Leverage</span>
+                            <span className="text-xs text-cyan-400 font-mono">{renderValueOrRange(group.levs, group.minLev, group.maxLev, 'x')}</span>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Returns */}
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-0.5">Total Return</div>
-                        <div className={`text-2xl font-bold font-mono ${group.roundedTotal >= 0 ? "text-green-400" : "text-red-400"}`}>
-                          <NumberFlow value={group.roundedTotal} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
+                    {/* PRIMARY METRIC - Total Return */}
+                    <div className="flex-1 space-y-4">
+                      <div className="text-center py-2">
+                        <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Total Return</div>
+                        <div className={`text-3xl font-bold font-mono ${group.roundedTotal >= 0 ? "text-green-400" : "text-red-400"}`}>
+                          <NumberFlow value={group.roundedTotal} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} prefix={group.roundedTotal >= 0 ? '+' : ''} suffix="%" />
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="text-xs text-muted-foreground">Monthly</div>
-                          <div className={`text-sm font-mono font-semibold ${strategy.monthlyReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {/* Secondary Metrics - De-emphasized */}
+                      <div className="grid grid-cols-2 gap-3 px-2">
+                        <div className="text-center">
+                          <div className="text-[10px] text-gray-600">Monthly</div>
+                          <div className={`text-sm font-mono font-medium ${strategy.monthlyReturn >= 0 ? "text-gray-400" : "text-red-400/70"}`}>
                             <NumberFlow value={strategy.monthlyReturn} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
                           </div>
                         </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground">Sharpe</div>
-                          <div className={`text-sm font-mono font-semibold ${strategy.sharpeRatio > 1 ? "text-green-400" : strategy.sharpeRatio > 0 ? "text-yellow-400" : "text-red-400"}`}>
+                        <div className="text-center">
+                          <div className="text-[10px] text-gray-600">Sharpe</div>
+                          <div className={`text-sm font-mono font-medium text-gray-400`}>
                             <NumberFlow value={strategy.sharpeRatio} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} />
                           </div>
                         </div>
                       </div>
 
-                      {/* Metrics Grid */}
-                      <div className="grid grid-cols-2 gap-1 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Win:</span>
-                          <span className="font-mono font-semibold text-blue-400">
+                      {/* Tertiary Metrics - Further de-emphasized */}
+                      <div className="border-t border-gray-800/50 pt-3 grid grid-cols-2 gap-x-3 gap-y-1 px-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-600">Win</span>
+                          <span className="text-[11px] font-mono text-gray-500">
                             <NumberFlow value={strategy.winRate} format={{ minimumFractionDigits: 0, maximumFractionDigits: 0 }} suffix="%" />
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">DD:</span>
-                          <span className="font-mono font-semibold text-red-400">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-600">DD</span>
+                          <span className="text-[11px] font-mono text-gray-500">
                             <NumberFlow value={-Math.abs(strategy.maxDrawdown)} format={{ minimumFractionDigits: 0, maximumFractionDigits: 0 }} suffix="%" />
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Trades:</span>
-                          <span className="font-mono font-semibold text-cyan-400">{strategy.totalTrades}</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-600">Trades</span>
+                          <span className="text-[11px] font-mono text-gray-500">{strategy.totalTrades}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Time:</span>
-                          <span className="font-mono font-semibold text-blue-400">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-600">Time</span>
+                          <span className="text-[11px] font-mono text-gray-500">
                             <NumberFlow value={strategy.timeInMarket} format={{ minimumFractionDigits: 0, maximumFractionDigits: 0 }} suffix="%" />
                           </span>
                         </div>
@@ -428,18 +428,21 @@ export function StrategyCarousel({ onApplyStrategy, currentAsset = "ETH", classN
                       )}
                     </div>
 
-                    {/* Apply Button */}
-                    <button onClick={() => onApplyStrategy?.(strategy)} className="w-full mt-3 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-medium text-xs transition-colors flex items-center justify-center gap-1">
-                      <Target className="w-3 h-3" />
-                      Apply Strategy
+                    {/* Apply Button - Subtle until hovered */}
+                    <button
+                      onClick={() => onApplyStrategy?.(strategy)}
+                      className="w-full mt-4 px-3 py-2 bg-gray-800/50 hover:bg-cyan-500/20 rounded-lg text-gray-500 hover:text-cyan-400 font-medium text-xs transition-all duration-200 flex items-center justify-center gap-1.5 group"
+                    >
+                      <Target className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                      <span>Apply Strategy</span>
                     </button>
                   </div>
                 </div>
               </CarouselItem>
               )})}
           </CarouselContent>
-          <CarouselPrevious className="-left-12 bg-black/50 border-border/50 hover:bg-black/70 text-white" />
-          <CarouselNext className="-right-12 bg-black/50 border-border/50 hover:bg-black/70 text-white" />
+          <CarouselPrevious className="-left-12 bg-gray-900/80 border-gray-700 hover:bg-gray-900 hover:border-gray-600 text-gray-400 hover:text-white transition-all" />
+          <CarouselNext className="-right-12 bg-gray-900/80 border-gray-700 hover:bg-gray-900 hover:border-gray-600 text-gray-400 hover:text-white transition-all" />
         </Carousel>
       )}
     </div>

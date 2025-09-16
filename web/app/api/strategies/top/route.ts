@@ -36,7 +36,6 @@ export async function GET(request: NextRequest) {
         orderByColumn = 'sharpe_ratio';
         break;
       case 'monthlyReturn':
-        // Calculate monthly return from total_return (assuming 90 days of data)
         orderByColumn = 'total_return / 3'; // Approximation for monthly
         break;
       default:
@@ -44,13 +43,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Query top performing strategies from all assets
-  // Match base assets like ETH to asset values like 'ETH' or 'ETH-PERP'
-  const where = asset && asset !== 'all' ? 'WHERE UPPER(asset) LIKE ?' : ''
-  const params: any[] = []
-  const upperAsset = (asset || '').toUpperCase()
-  if (where) params.push(`${upperAsset}%`)
+    // Match base assets like ETH to asset values like 'ETH' or 'ETH-PERP'
+    const where = asset && asset !== 'all' ? 'WHERE UPPER(asset) LIKE ?' : ''
+    const params: any[] = []
+    const upperAsset = (asset || '').toUpperCase()
+    if (where) params.push(`${upperAsset}%`)
     params.push(limit)
 
+    // Fixed query - get best performing strategy for each asset/strategy combination
+    // This prevents ETH from dominating with 651 duplicate strategies
     const query = `
       SELECT
         asset,
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
         leverage,
         total_return as totalReturn,
         total_return / 3 as monthlyReturn,
-        sharpe_ratio as sharpeRatio,
+        sharpe_ratio,
         max_drawdown as maxDrawdown,
         win_rate as winRate,
         num_trades as totalTrades,
@@ -68,15 +69,13 @@ export async function GET(request: NextRequest) {
         liquidations
       FROM backtests
       ${where}
+      GROUP BY asset, strategy
+      HAVING total_return = MAX(total_return)
       ORDER BY ${orderByColumn} DESC
       LIMIT ?
     `;
 
     const strategies = db.prepare(query).all(...params) as StrategyResult[];
-
-    // Get total count for metadata
-  const countQuery = `SELECT COUNT(*) as count FROM backtests ${where}`
-  const countResult = db.prepare(countQuery).get(where ? `${upperAsset}%` : undefined) as {count: number};
 
     db.close();
 
@@ -93,7 +92,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       strategies: strategiesWithRisk,
-      totalStrategiesAnalyzed: countResult.count
+      totalStrategiesAnalyzed: strategiesWithRisk.length
     });
 
   } catch (error) {

@@ -145,17 +145,17 @@ export function FGITimeSeries({
   };
 
   return (
-    <div className={`bg-card border border-border rounded-xl p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+    <div className={`bg-gray-900/50 rounded-2xl p-8 shadow-xl backdrop-blur-sm ${className}`}>
+      {/* Header with better hierarchy */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-6">
           <div>
-            <h2 className="text-xl font-bold text-foreground">Fear & Greed Index</h2>
-            <p className="text-sm text-muted-foreground">Historical trends and current market sentiment</p>
+            <h2 className="text-2xl font-bold text-gray-100">Fear & Greed Index</h2>
+            <p className="text-xs text-gray-500 mt-1">Market sentiment analysis over time</p>
           </div>
           {/* Asset Selector */}
           <Select value={asset} onValueChange={(v) => onAssetChange(v as 'SOL' | 'ETH')}>
-            <SelectTrigger className="w-20 h-10 bg-background border-border text-center font-mono font-bold">
+            <SelectTrigger className="w-24 h-10 bg-black/30 border-gray-700 hover:border-gray-500 text-center font-mono font-bold text-cyan-400">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -165,23 +165,26 @@ export function FGITimeSeries({
           </Select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold font-mono" style={{ color: getFGIColor(currentFGI) }}>
-            {currentFGI}
-          </span>
-          <div className="text-xs text-muted-foreground">
-            {currentFGI <= 25 ? 'EXTREME FEAR' :
-             currentFGI <= 45 ? 'FEAR' :
-             currentFGI <= 55 ? 'NEUTRAL' :
-             currentFGI <= 75 ? 'GREED' : 'EXTREME GREED'}
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Current FGI</span>
+            <span className="text-4xl font-bold font-mono" style={{ color: getFGIColor(currentFGI) }}>
+              {currentFGI}
+            </span>
+            <div className="text-xs font-medium mt-1" style={{ color: getFGIColor(currentFGI) }}>
+              {currentFGI <= 25 ? 'EXTREME FEAR' :
+               currentFGI <= 45 ? 'FEAR' :
+               currentFGI <= 55 ? 'NEUTRAL' :
+               currentFGI <= 75 ? 'GREED' : 'EXTREME GREED'}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ViewWindow Selector */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex gap-2">
-          <span className="text-sm text-muted-foreground self-center mr-2">View:</span>
+      {/* Controls with improved layout */}
+      <div className="flex justify-between items-center mb-8 pb-6 border-b border-gray-800/50">
+        <div className="flex gap-3 items-center">
+          <span className="text-xs text-gray-500 uppercase tracking-wider">Period</span>
           {Object.entries(VIEW_WINDOW_CONFIG).map(([key, config]) => (
             <Button
               key={key}
@@ -197,8 +200,8 @@ export function FGITimeSeries({
             </Button>
           ))}
         </div>
-        <div className="flex gap-2 items-center">
-           <span className="text-sm text-muted-foreground self-center mr-2">Interval:</span>
+        <div className="flex gap-3 items-center">
+           <span className="text-xs text-gray-500 uppercase tracking-wider">Interval</span>
           <ToggleGroup 
             type="single" 
             value={dataInterval}
@@ -224,8 +227,8 @@ export function FGITimeSeries({
       </div>
 
 
-      {/* Chart */}
-      <div className="h-80 w-full">
+      {/* Chart with increased height for better readability */}
+      <div className="h-96 w-full bg-black/20 rounded-xl p-4">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -237,22 +240,25 @@ export function FGITimeSeries({
             </div>
           ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+            <ComposedChart data={chartData} margin={{ top: 30, right: 40, left: 40, bottom: 40 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
               <XAxis
                 dataKey="timestamp"
                 tickFormatter={formatTimestamp}
-                stroke="#64748b"
-                fontSize={12}
-                axisLine={false}
+                stroke="#6b7280"
+                fontSize={11}
+                axisLine={{ stroke: '#374151', strokeWidth: 1 }}
                 tickLine={false}
+                tick={{ fill: '#9ca3af' }}
               />
               <YAxis
                 domain={[0, 100]}
-                stroke="#64748b"
-                fontSize={12}
-                axisLine={false}
+                stroke="#6b7280"
+                fontSize={11}
+                axisLine={{ stroke: '#374151', strokeWidth: 1 }}
                 tickLine={false}
+                tick={{ fill: '#9ca3af' }}
+                label={{ value: 'FGI Value', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: 10 } }}
               />
 
               {/* Threshold lines */}
@@ -280,14 +286,14 @@ export function FGITimeSeries({
                 isAnimationActive={false}
               />
 
-              {/* Main FGI line */}
+              {/* Main FGI line with enhanced visibility */}
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#8b5cf6"
-                strokeWidth={3}
+                stroke="#a78bfa"
+                strokeWidth={3.5}
                 dot={false}
-                activeDot={{ r: 6, stroke: '#8b5cf6', strokeWidth: 2, fill: '#ffffff' }}
+                activeDot={{ r: 8, stroke: '#a78bfa', strokeWidth: 3, fill: '#1f2937' }}
               />
 
               {/* Current value indicator */}
@@ -317,15 +323,32 @@ export function FGITimeSeries({
         )}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mt-4 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 bg-cyan-400 opacity-70"></div>
-          <span className="text-muted-foreground">Buy Threshold ({thresholds.low})</span>
+      {/* Enhanced Legend with zones */}
+      <div className="mt-6 space-y-4">
+        <div className="flex items-center justify-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-1 bg-cyan-400 rounded-full"></div>
+            <span className="text-xs text-gray-400">Buy Zone &lt; {thresholds.low}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-1 bg-gray-600 rounded-full"></div>
+            <span className="text-xs text-gray-400">Neutral {thresholds.low}-{thresholds.high}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-1 bg-pink-400 rounded-full"></div>
+            <span className="text-xs text-gray-400">Sell Zone &gt; {thresholds.high}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 bg-pink-400 opacity-70"></div>
-          <span className="text-muted-foreground">Sell Threshold ({thresholds.high})</span>
+
+        {/* FGI Scale Reference */}
+        <div className="flex items-center justify-center">
+          <div className="flex items-center gap-1 text-[10px] text-gray-600">
+            <span className="px-2 py-1 rounded bg-red-900/30 text-red-400">0-25 Fear</span>
+            <span className="px-2 py-1 rounded bg-orange-900/30 text-orange-400">26-45 Fear</span>
+            <span className="px-2 py-1 rounded bg-yellow-900/30 text-yellow-400">46-55 Neutral</span>
+            <span className="px-2 py-1 rounded bg-lime-900/30 text-lime-400">56-75 Greed</span>
+            <span className="px-2 py-1 rounded bg-blue-900/30 text-blue-400">76-100 Extreme</span>
+          </div>
         </div>
       </div>
     </div>

@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
   const requestContext = { method: 'GET', endpoint: '/api/bot/status' }
 
   try {
-    // Read state file
-    const statePath = path.join(process.cwd(), '..', 'data', 'current-state', 'fgi-drift-state-v2.json')
-    const configPath = path.join(process.cwd(), '..', 'data', 'trading-config.json')
+    // Read state file from root directory where bot saves it
+    const statePath = path.join(process.cwd(), '..', 'fgi-drift-state-v2.json')
+    const configPath = path.join(process.cwd(), '..', 'trading-config.json')
     
     let state = {
       hasOpenPosition: false,
@@ -99,9 +99,8 @@ export async function GET(request: NextRequest) {
       currentPnLPercent = (priceDiff / state.entryPrice) * 100 * leverage
     }
 
-    // Read daily performance
-    const today = new Date().toISOString().split('T')[0]
-    const perfPath = path.join(process.cwd(), '..', 'data', 'performance', `daily-performance-${today}.json`)
+    // Read daily performance from root directory
+    const perfPath = path.join(process.cwd(), '..', 'daily-performance.json')
     let balance = 10000 // Default starting balance
     
     if (fs.existsSync(perfPath)) {

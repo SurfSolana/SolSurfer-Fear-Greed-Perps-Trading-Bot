@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Write complete configuration to shared JSON file for hot-reload
-    const configPath = path.join(process.cwd(), '..', 'data', 'trading-config.json')
+    // Bot reads from root trading-config.json, not data/trading-config.json
+    const configPath = path.join(process.cwd(), '..', 'trading-config.json')
+    // Create config object matching TradingConfig interface
     const config = {
       asset,
       leverage,
@@ -69,15 +71,8 @@ export async function POST(request: NextRequest) {
       highThreshold,
       strategy,
       enabled: true,
-      timeframe,
-      maxPositionRatio,
-      updatedAt: new Date().toISOString()
-    }
-
-    // Ensure data directory exists
-    const dataDir = path.join(process.cwd(), '..', 'data')
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true })
+      dataInterval: timeframe, // Use 'dataInterval' to match ConfigurationManager
+      maxPositionRatio
     }
 
     // Write configuration with proper formatting
@@ -89,16 +84,16 @@ export async function POST(request: NextRequest) {
 
     try {
       if (existingProcess) {
-        // Restart the existing process
+        // Restart the existing process to reload configuration
         await execAsync('pm2 restart drift-fgi-trader')
         console.log('Bot restarted successfully via PM2')
         return createSuccessResponse(
           { config, restarted: true },
-          'Trading bot restarted successfully'
+          'Trading bot restarted with new configuration'
         )
       } else {
-        // Start new process
-        const startCommand = `pm2 start ${scriptPath} --name drift-fgi-trader --interpreter bun -- service`
+        // Start new process with force flag in case of stale PM2 state
+        const startCommand = `pm2 start ${scriptPath} --name drift-fgi-trader --interpreter bun --force -- service`
         await execAsync(startCommand, { cwd: path.join(process.cwd(), '..') })
         console.log('Bot started successfully via PM2')
         return createSuccessResponse(

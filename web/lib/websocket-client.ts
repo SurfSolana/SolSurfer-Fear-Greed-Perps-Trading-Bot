@@ -27,12 +27,12 @@ export class WebSocketClient {
   private fallbackActive = false
 
   constructor(options: WebSocketClientOptions = {}) {
-    // WebSocket server runs on port 3001 due to Next.js 15 limitations
+    // WebSocket server runs on port 3003 due to Next.js 15 limitations
     const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-    
+
     this.options = {
-      url: `${protocol}//${hostname}:3001`,
+      url: `${protocol}//${hostname}:3003`,
       reconnectInterval: 1000, // Start with 1 second
       maxReconnectAttempts: 10,
       heartbeatInterval: 30000, // 30 seconds

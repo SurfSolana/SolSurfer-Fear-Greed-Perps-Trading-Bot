@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "test": "bun test",
+    "test": "bun test --preload ./jest.setup.ts",
     "test:contract": "bun test __tests__/contract/",
     "test:contract:backtest": "bun test __tests__/contract/backtest-execute.test.ts",
     "cache-warmer": "bun scripts/cache-warmer.ts",

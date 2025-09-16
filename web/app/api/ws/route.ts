@@ -234,14 +234,27 @@ function sendMessage(ws: WebSocket, message: WebSocketMessage) {
   }
 }
 
+// Helper function to check PM2 process status using CLI
+async function checkPM2Process(name: string): Promise<any | null> {
+  try {
+    const { execSync } = require('child_process')
+    const result = execSync('pm2 jlist', { encoding: 'utf-8' })
+    const processes = JSON.parse(result)
+    const process = processes.find((p: any) => p.name === name)
+    return process || null
+  } catch (error) {
+    console.error('Failed to check PM2 process:', error)
+    return null
+  }
+}
+
 /**
  * Get current bot status (reusing logic from status route)
  */
 async function getCurrentBotStatus(): Promise<TradingStatus> {
   try {
-    const statePath = path.join(process.cwd(), '..', 'data', 'current-state', 'fgi-drift-state-v2.json')
-    const pidPath = path.join(process.cwd(), '..', 'bot.pid')
-    
+    const statePath = path.join(process.cwd(), '..', 'fgi-drift-state-v2.json')
+
     let state = {
       hasOpenPosition: false,
       direction: 'NEUTRAL' as 'LONG' | 'SHORT' | 'NEUTRAL',
@@ -259,17 +272,9 @@ async function getCurrentBotStatus(): Promise<TradingStatus> {
       state = { ...state, ...savedState }
     }
 
-    // Check if bot is running
-    let isRunning = false
-    if (fs.existsSync(pidPath)) {
-      try {
-        const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim())
-        process.kill(pid, 0)
-        isRunning = true
-      } catch (error) {
-        isRunning = false
-      }
-    }
+    // Check if bot is running using PM2 API
+    const botProcess = await checkPM2Process('drift-fgi-trader')
+    const isRunning = botProcess !== null && botProcess.pm2_env?.status === 'online'
 
     // Get current FGI and price
     let currentFGI = 50
@@ -289,15 +294,16 @@ async function getCurrentBotStatus(): Promise<TradingStatus> {
       console.error('Failed to fetch FGI:', error)
     }
 
-    // Get balance
-    const today = new Date().toISOString().split('T')[0]
-    const perfPath = path.join(process.cwd(), '..', 'data', 'performance', `daily-performance-${today}.json`)
+    // Get balance from root daily performance file
+    const perfPath = path.join(process.cwd(), '..', 'daily-performance.json')
     let balance = 10000
-    
+    let currentPnL = 0
+
     if (fs.existsSync(perfPath)) {
       const perfContent = fs.readFileSync(perfPath, 'utf-8')
       const performance = JSON.parse(perfContent)
       balance = performance.currentBalance || balance
+      currentPnL = performance.currentPnL || 0
     }
 
     // Determine connection state based on API access
@@ -313,7 +319,9 @@ async function getCurrentBotStatus(): Promise<TradingStatus> {
       isActive: isRunning,
       mode: 'paper' as const,
       connectionState,
-      lastUpdate: new Date().toISOString()
+      lastUpdate: new Date().toISOString(),
+      currentPnL,
+      balance
     }
   } catch (error) {
     console.error('Failed to get bot status:', error)
@@ -321,7 +329,9 @@ async function getCurrentBotStatus(): Promise<TradingStatus> {
       isActive: false,
       mode: 'paper' as const,
       connectionState: 'disconnected' as const,
-      lastUpdate: new Date().toISOString()
+      lastUpdate: new Date().toISOString(),
+      currentPnL: 0,
+      balance: 10000
     }
   }
 }

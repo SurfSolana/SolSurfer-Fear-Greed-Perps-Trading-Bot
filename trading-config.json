@@ -1,10 +1,10 @@
 {
-  "asset": "ETH",
-  "leverage": 8,
-  "lowThreshold": 49,
-  "highThreshold": 50,
-  "maxPositionRatio": 1,
+  "asset": "BTC",
+  "leverage": 5,
+  "lowThreshold": 20,
+  "highThreshold": 80,
   "strategy": "contrarian",
   "enabled": true,
-  "timeframe": "4h"
+  "dataInterval": "4h",
+  "maxPositionRatio": 1
 }

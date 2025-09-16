@@ -1,0 +1,141 @@
+/* Typography System Classes
+ * Based on theme.config.ts typography scale
+ * Use these classes for consistent text hierarchy throughout the app
+ */
+
+@layer components {
+  /* Caption - 12px - Smallest text for labels and metadata */
+  .text-caption {
+    @apply text-xs leading-4 tracking-wide;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    letter-spacing: 0.5px;
+  }
+
+  /* Body - 14px - Default body text */
+  .text-body {
+    @apply text-sm leading-5 tracking-wide;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    letter-spacing: 0.25px;
+  }
+
+  /* Body Large - 16px - Emphasized body text */
+  .text-body-large {
+    @apply text-base leading-6;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    letter-spacing: 0;
+  }
+
+  /* Heading 3 - 18px - Small section headers */
+  .text-heading-3 {
+    @apply text-lg leading-7 tracking-tight font-medium;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    letter-spacing: -0.25px;
+  }
+
+  /* Heading 2 - 24px - Main section headers */
+  .text-heading-2 {
+    @apply text-2xl leading-8 tracking-tight font-semibold;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    letter-spacing: -0.5px;
+  }
+
+  /* Heading 1 - 32px - Page titles */
+  .text-heading-1 {
+    @apply text-3xl leading-10 tracking-tight font-bold;
+    font-size: 2rem;
+    line-height: 2.5rem;
+    letter-spacing: -1px;
+  }
+
+  /* Display - 48px - Hero text */
+  .text-display {
+    @apply text-5xl leading-none tracking-tight font-bold;
+    font-size: 3rem;
+    line-height: 3rem;
+    letter-spacing: -1.5px;
+  }
+
+  /* Hierarchy classes for metrics */
+  .metric-primary {
+    @apply text-2xl font-bold;
+    color: var(--text-primary);
+  }
+
+  .metric-secondary {
+    @apply text-base font-semibold;
+    color: var(--text-primary);
+    opacity: 0.9;
+  }
+
+  .metric-tertiary {
+    @apply text-sm font-medium;
+    color: var(--text-secondary);
+    opacity: 0.8;
+  }
+
+  .metric-label {
+    @apply text-[10px] uppercase tracking-widest;
+    color: var(--text-muted);
+    opacity: 0.6;
+    letter-spacing: 1px;
+  }
+
+  /* Semantic text colors with proper contrast */
+  .text-primary-emphasis {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .text-secondary-emphasis {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .text-muted-emphasis {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  /* Status text with icons */
+  .text-status-success {
+    @apply text-green-400 font-medium;
+  }
+
+  .text-status-danger {
+    @apply text-red-400 font-medium;
+  }
+
+  .text-status-warning {
+    @apply text-yellow-400 font-medium;
+  }
+
+  .text-status-info {
+    @apply text-cyan-400 font-medium;
+  }
+
+  /* Monospace variants for data display */
+  .mono-caption {
+    @apply font-mono text-xs leading-4;
+    letter-spacing: 0.5px;
+  }
+
+  .mono-body {
+    @apply font-mono text-sm leading-5;
+    letter-spacing: 0.25px;
+  }
+
+  .mono-large {
+    @apply font-mono text-base leading-6;
+    letter-spacing: 0;
+  }
+
+  .mono-display {
+    @apply font-mono text-2xl leading-8 font-bold;
+    letter-spacing: -0.5px;
+  }
+}

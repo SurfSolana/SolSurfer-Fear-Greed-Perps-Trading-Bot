@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { TradingParameters, TradingStatus } from '@/lib/types'
-import { CompactStatus } from '@/components/compact-status'
+import { ControlPanel } from '@/components/control-panel'
 import { FGITimeSeries, ViewWindow, DataInterval } from '@/components/fgi-time-series'
-import { BigNumberControls } from '@/components/big-number-controls'
-import { StrategyCarousel } from '@/components/strategy-carousel'
+import { useWebSocketClient } from '@/lib/websocket-client'
 
 export default function TradingDashboard() {
   // Parameters and status
@@ -29,6 +28,14 @@ export default function TradingDashboard() {
   const [balance, setBalance] = useState<number | undefined>(undefined)
   const [selectedViewWindow, setSelectedViewWindow] = useState<ViewWindow>('7days')
   const [dataInterval, setDataInterval] = useState<DataInterval>('4h')
+
+  // Initialize WebSocket client with fallback to polling
+  const wsClient = useWebSocketClient({
+    fallbackToPolling: () => {
+      console.log('WebSocket connection failed, falling back to polling')
+      startPolling()
+    }
+  })
 
   // Fetch current FGI
   const fetchFGI = useCallback(async () => {
@@ -63,16 +70,61 @@ export default function TradingDashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    // Load immediately on mount
+  // Polling fallback function
+  const startPolling = useCallback(() => {
+    console.log('Starting polling fallback')
     fetchFGI()
     fetchBotStatus()
-    const i = setInterval(() => {
+    const interval = setInterval(() => {
       fetchFGI()
       fetchBotStatus()
     }, 30000)
-    return () => clearInterval(i)
+    return () => clearInterval(interval)
   }, [fetchFGI, fetchBotStatus])
+
+  // WebSocket effect - preferred method
+  useEffect(() => {
+    let cleanupPolling: (() => void) | undefined
+
+    // Try to connect to WebSocket first
+    wsClient.connect().then(() => {
+      console.log('WebSocket connected successfully')
+
+      // Subscribe to real-time updates
+      const unsubscribeBotStatus = wsClient.onBotStatus((status) => {
+        setBotStatus({
+          isActive: status.isActive,
+          mode: status.mode,
+          connectionState: status.connectionState,
+          lastUpdate: status.lastUpdate || new Date().toISOString()
+        })
+        // Note: TradingStatus schema doesn't include financial fields.
+        // Current PnL and balance are updated via REST polling/backtest estimate.
+      })
+
+      const unsubscribeFGI = wsClient.onFGIUpdate((fgiData) => {
+        setCurrentFGI(fgiData.value || 50)
+      })
+
+      // Cleanup subscriptions
+      return () => {
+        unsubscribeBotStatus()
+        unsubscribeFGI()
+      }
+    }).catch((error) => {
+      console.warn('WebSocket connection failed, using polling fallback:', error)
+      cleanupPolling = startPolling()
+    })
+
+    // Initial data fetch
+    fetchFGI()
+    fetchBotStatus()
+
+    // Cleanup function
+    return () => {
+      if (cleanupPolling) cleanupPolling()
+    }
+  }, [wsClient, fetchFGI, fetchBotStatus, startPolling])
 
   // Estimate 30d rolling PnL using backtest API (4h baseline)
   const [estimatedPnL, setEstimatedPnL] = useState(0)
@@ -172,56 +224,44 @@ export default function TradingDashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Top status bar with integrated controls */}
-      <CompactStatus
-        botStatus={botStatus}
-        currentPnL={currentPnL}
-        fgiValue={currentFGI}
-        balance={balance}
-        parameters={parameters}
-        onParametersChange={handleParametersChange}
-        onStart={handleStart}
-        onStop={handleStop}
-        onSave={handleSave}
-        className="fixed top-0 left-0 right-0 z-50"
-      />
-
-      <main className="pt-16 container mx-auto px-4 py-6 space-y-6">
-        {/* Header action row */}
-        <div className="flex justify-end">
-          <a href="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Docs</a>
-        </div>
-        {/* Big number controls with carousel inside */}
-        <BigNumberControls
-          parameters={parameters}
-          onParametersChange={handleParametersChange}
-          estimatedPnL={estimatedPnL}
-          projectedBalance={projectedBalance}
-          backtestResult={backtestResult}
-        >
-          {/* Strategy carousel as child */}
-          <div className="mt-6 mb-6">
-            <StrategyCarousel
+      <main className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          {/* Left Column: Control Panel */}
+          <div className="lg:col-span-1">
+            <ControlPanel
+              parameters={parameters}
+              onParametersChange={handleParametersChange}
+              botStatus={botStatus}
+              currentPnL={currentPnL}
+              fgiValue={currentFGI}
+              balance={balance}
+              estimatedPnL={estimatedPnL}
+              projectedBalance={projectedBalance}
+              backtestResult={backtestResult}
+              onStart={handleStart}
+              onStop={handleStop}
+              onSave={handleSave}
               onApplyStrategy={handleApplyStrategy}
-              currentAsset={parameters.asset}
             />
           </div>
-        </BigNumberControls>
 
-        {/* FGI graph with timeframe selector inside */}
-        <FGITimeSeries
-          currentFGI={currentFGI}
-          asset={parameters.asset || 'ETH'}
-          onAssetChange={(asset) => handleParametersChange({ ...parameters, asset })}
-          selectedViewWindow={selectedViewWindow}
-          onViewWindowChange={setSelectedViewWindow}
-          dataInterval={dataInterval}
-          onDataIntervalChange={setDataInterval}
-          thresholds={{
-            low: parameters.lowThreshold ?? 25,
-            high: parameters.highThreshold ?? 75
-          }}
-        />
+          {/* Right Column: Chart */}
+          <div className="lg:col-span-2">
+            <FGITimeSeries
+              currentFGI={currentFGI}
+              asset={parameters.asset || 'ETH'}
+              onAssetChange={(asset) => handleParametersChange({ ...parameters, asset })}
+              selectedViewWindow={selectedViewWindow}
+              onViewWindowChange={setSelectedViewWindow}
+              dataInterval={dataInterval}
+              onDataIntervalChange={setDataInterval}
+              thresholds={{
+                low: parameters.lowThreshold ?? 25,
+                high: parameters.highThreshold ?? 75
+              }}
+            />
+          </div>
+        </div>
       </main>
     </div>
   )

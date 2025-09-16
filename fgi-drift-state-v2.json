@@ -1,9 +1,8 @@
 {
-  "hasOpenPosition": true,
-  "size": 0.016,
-  "entryPrice": 4523.997125,
-  "entryFGI": 46,
-  "timestamp": 1757979421081,
-  "lastCheckedFGI": 46,
-  "lastCheckTime": 1757983946123
+  "hasOpenPosition": false,
+  "size": 0,
+  "entryPrice": 0,
+  "entryFGI": 54,
+  "lastCheckedFGI": 54,
+  "lastCheckTime": 1757997686425
 }
