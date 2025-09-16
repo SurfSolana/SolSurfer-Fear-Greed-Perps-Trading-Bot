@@ -44,9 +44,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Query top performing strategies from all assets
-    const where = asset && asset !== 'all' ? 'WHERE asset = ?' : ''
-    const params: any[] = []
-    if (where) params.push(asset)
+  // Match base assets like ETH to asset values like 'ETH' or 'ETH-PERP'
+  const where = asset && asset !== 'all' ? 'WHERE UPPER(asset) LIKE ?' : ''
+  const params: any[] = []
+  const upperAsset = (asset || '').toUpperCase()
+  if (where) params.push(`${upperAsset}%`)
     params.push(limit)
 
     const query = `
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     // Get total count for metadata
   const countQuery = `SELECT COUNT(*) as count FROM backtests ${where}`
-  const countResult = db.prepare(countQuery).get(where ? asset : undefined) as {count: number};
+  const countResult = db.prepare(countQuery).get(where ? `${upperAsset}%` : undefined) as {count: number};
 
     db.close();
 
