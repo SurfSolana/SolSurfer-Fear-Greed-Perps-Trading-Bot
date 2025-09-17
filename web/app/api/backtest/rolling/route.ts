@@ -107,7 +107,8 @@ function normalizeParams(body: BacktestRequestBody) {
 }
 
 async function fetchHistoricalPoints(asset: Asset, timeframe: Timeframe): Promise<HistoricalPoint[]> {
-  const url = `https://api.surfsolana.com/${asset}/${timeframe}/30_days.json`
+  // Use 1_year.json as it has accurate, up-to-date data
+  const url = `https://api.surfsolana.com/${asset}/${timeframe}/1_year.json`
   const response = await fetch(url, { cache: 'no-store' })
 
   if (!response.ok) {
@@ -120,6 +121,11 @@ async function fetchHistoricalPoints(asset: Asset, timeframe: Timeframe): Promis
     throw new Error('Unexpected data format from historical API')
   }
 
+  // Calculate the date 30 days ago from now
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const thirtyDaysAgoTime = thirtyDaysAgo.getTime()
+
   const points: HistoricalPoint[] = []
   let lastPrice: number | null = null
   let lastFgi: number | null = null
@@ -127,6 +133,10 @@ async function fetchHistoricalPoints(asset: Asset, timeframe: Timeframe): Promis
   for (const entry of records) {
     const timestampRaw = entry.timestamp || entry.date
     if (!timestampRaw) continue
+
+    // Filter to only include last 30 days of data
+    const entryTime = new Date(timestampRaw).getTime()
+    if (entryTime < thirtyDaysAgoTime) continue
 
     const parsedPrice = Number(entry.price ?? entry.close ?? entry.raw?.price)
     const parsedFgi = Number(entry.fgi ?? entry.cfgi ?? entry.raw?.cfgi ?? entry.value)
