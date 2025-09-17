@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-/* Layout grid styles excluded */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -9,896 +8,386 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 6px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Custom slider styles for filters */
-.slider-thumb::-webkit-slider-thumb {
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  background: rgb(34 211 238);
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.slider-thumb::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  background: rgb(34 211 238);
-  border-radius: 50%;
-  cursor: pointer;
-  border: none;
-}
-
-.slider-thumb::-webkit-slider-runnable-track {
-  background: linear-gradient(to right, rgb(34 211 238) var(--value), rgba(255, 255, 255, 0.1) var(--value));
-}
-
 :root {
-  /* REDESIGN COLORS - New Design System */
-  --bg-primary: #000000;
-  --bg-secondary: #1a1a1a; /* Increased contrast from primary */
-  --accent-primary: #00ffcc; /* Cyan */
-  --accent-danger: #ff0066;  /* Pink */
-  --accent-success: #00ff88; /* Green */
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0; /* Brighter for better readability */
-
   /* Typography */
-  /* Use next/font provided variables as the source of truth */
-  /* Tailwind v4 maps font-sans/font-mono to --font-sans/--font-mono via @theme above */
-  /* We also provide aliases for existing code that referenced older variable names */
-  --font-display: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  /* Aliases to keep legacy references working */
-  --font-family-primary: var(--font-geist-sans);
-  --font-family-display: var(--font-geist-sans);
-  --font-family-mono: var(--font-geist-mono);
 
-  /* Typography scale and weights */
-  --font-size-base: 16px;
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-lg: 18px;
-  --font-size-xl: 20px;
-  --font-size-2xl: 24px;
-  --font-size-3xl: 30px;
-  --font-size-4xl: 36px;
-  --line-height-normal: 1.6;
-  --line-height-tight: 1.2;
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --letter-spacing-tight: -0.01em;
-  --letter-spacing-wide: 0.08em;
+  /* Core surfaces inspired by the control panel reference */
+  --background: #070b13;
+  --background-muted: #0c101b;
+  --surface-1: #111827;
+  --surface-2: #18202f;
+  --surface-3: #1f2937;
+  --surface-4: #273348;
+  --surface-border: rgba(148, 163, 184, 0.16);
+  --surface-border-strong: rgba(148, 163, 184, 0.32);
 
-  /* Tailwind Integration */
-  --radius: 0.5rem;
-  --background: var(--bg-primary);
-  --foreground: var(--text-primary);
-  --card: var(--bg-secondary);
-  --card-foreground: var(--text-primary);
-  --popover: var(--bg-secondary);
-  --popover-foreground: var(--text-primary);
+  /* Text */
+  --foreground: #f9fafb;
+  --muted: rgba(148, 163, 184, 0.08);
+  --muted-foreground: #94a3b8;
 
-  /* Primary Colors */
-  --primary: var(--accent-primary);
-  --primary-foreground: var(--bg-primary);
+  /* Brand accents lifted from the image */
+  --primary: #ff8b3d; /* central dial glow */
+  --primary-foreground: #080c14;
+  --accent-cyan: #39bdf8;
+  --accent-purple: #a78bfa;
+  --accent-amber: #facc15;
+  --accent-pink: #fb7185;
+  --accent-lime: #a3e635;
 
-  /* Secondary Colors */
-  --secondary: var(--bg-secondary);
-  --secondary-foreground: var(--text-secondary);
+  /* Functional colors */
+  --destructive: #fb7185;
+  --destructive-foreground: #080c14;
+  --success: #34d399;
+  --success-foreground: #02130a;
+  --warning: #facc15;
 
-  /* Muted Colors */
-  --muted: var(--bg-secondary);
-  --muted-foreground: var(--text-secondary);
+  /* Borders + rings */
+  --border: var(--surface-border);
+  --input: #141c2b;
+  --ring: #39bdf8;
 
-  /* Accent Colors */
-  --accent: var(--bg-secondary);
-  --accent-foreground: var(--text-primary);
+  /* Cards & popovers */
+  --card: var(--surface-2);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--foreground);
 
-  /* Semantic Colors */
-  --destructive: var(--accent-danger);
-  --destructive-foreground: var(--text-primary);
+  --secondary: var(--surface-3);
+  --secondary-foreground: var(--muted-foreground);
+  --accent: rgba(59, 130, 246, 0.18);
+  --accent-foreground: #cbd5f5;
 
-  /* Borders & Inputs */
-  --border: rgba(255, 255, 255, 0.2); /* More prominent border */
-  --input: var(--bg-secondary);
-  --ring: var(--accent-primary);
-
-  /* Chart Colors */
-  --chart-1: var(--accent-primary);
-  --chart-2: var(--accent-success);
-  --chart-3: #ffaa00;
-  --chart-4: #0088ff;
-  --chart-5: var(--accent-danger);
+  --radius: 18px;
+  --shadow-panel: 0 32px 80px rgba(0, 0, 0, 0.55);
+  --shadow-soft: 0 12px 32px rgba(2, 6, 23, 0.4);
+  --shadow-glow: 0 0 24px rgba(57, 189, 248, 0.35);
 }
 
-/* Dark mode is the default - crypto aesthetic is inherently dark */
-.dark,
-[data-theme="dark"] {
-  /* Inherit the crypto theme variables - already dark by design */
-  --background: var(--color-bg-primary);
-  --foreground: var(--color-text-primary);
+body {
+  background: radial-gradient(circle at 20% 20%, rgba(57, 189, 248, 0.08), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgba(250, 204, 21, 0.06), transparent 50%),
+    radial-gradient(circle at 90% 90%, rgba(250, 113, 133, 0.08), transparent 55%),
+    linear-gradient(145deg, var(--background-muted), #05070f 65%);
+  color: var(--foreground);
 }
 
 @layer base {
-  /* Global Crypto Theme Base Styles */
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
     box-sizing: border-box;
   }
 
   html {
-    /* Ensure the base font is Geist Sans (from next/font) with robust fallbacks */
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-    line-height: var(--line-height-normal);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    scroll-behavior: smooth;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--background);
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-transparent;
+    min-height: 100vh;
     margin: 0;
-    padding: 0;
-    background-color: var(--color-bg-primary);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-normal);
-    transition: background-color var(--duration-300) var(--ease-out);
+    display: flex;
+    flex-direction: column;
+    line-height: 1.6;
   }
 
-  /* Crypto-themed selection */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+  }
+
+  h1 { font-size: clamp(2.25rem, 3vw, 3.25rem); font-weight: 700; }
+  h2 { font-size: clamp(1.75rem, 2.5vw, 2.4rem); font-weight: 600; }
+  h3 { font-size: clamp(1.35rem, 1.8vw, 1.75rem); font-weight: 600; }
+
+  code, pre {
+    font-family: var(--font-mono, "SFMono-Regular"), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 12px;
+  }
+
   ::selection {
-    background-color: var(--color-primary);
-    color: var(--color-text-inverse);
-    text-shadow: none;
+    background: rgba(57, 189, 248, 0.35);
+    color: #f8fafc;
   }
 
-  ::-moz-selection {
-    background-color: var(--color-primary);
-    color: var(--color-text-inverse);
-    text-shadow: none;
+  :focus-visible {
+    outline: 2px solid rgba(57, 189, 248, 0.65);
+    outline-offset: 3px;
+    border-radius: 12px;
   }
 
-  /* Custom Scrollbar with Glow */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-bg-secondary);
-    border-radius: var(--radius-full);
+    background: #0b111d;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--color-border-primary);
-    border-radius: var(--radius-full);
-    transition: all var(--duration-200) var(--ease-out);
+    background: rgba(148, 163, 184, 0.32);
+    border-radius: 9999px;
+    border: 2px solid #0b111d;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-primary);
-    box-shadow: var(--glow-primary-sm);
-  }
-
-  /* Enhanced Focus Styles with Neon */
-  :focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
-    box-shadow: var(--glow-primary-sm);
-  }
-
-  :focus {
-    outline: none;
-  }
-
-  /* Headings with Crypto Styling */
-  h1, h2, h3, h4, h5, h6 {
-    /* Use the display font; default to Geist Sans */
-    font-family: var(--font-geist-sans);
-    font-weight: var(--font-weight-semibold);
-    line-height: var(--line-height-tight);
-    letter-spacing: var(--letter-spacing-tight);
-    color: var(--color-text-primary);
-  }
-
-  h1 {
-    font-size: var(--font-size-4xl);
-    font-weight: var(--font-weight-bold);
-  }
-
-  h2 {
-    font-size: var(--font-size-3xl);
-  }
-
-  h3 {
-    font-size: var(--font-size-2xl);
-  }
-
-  h4 {
-    font-size: var(--font-size-xl);
-  }
-
-  h5 {
-    font-size: var(--font-size-lg);
-  }
-
-  h6 {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-medium);
-  }
-
-  /* Links with Glow */
-  a {
-    color: var(--color-primary);
-    text-decoration: none;
-    transition: all var(--duration-200) var(--ease-out);
-  }
-
-  a:hover {
-    color: var(--color-primary-light);
-    text-shadow: var(--glow-primary-sm);
-  }
-
-  /* Code Elements */
-  code, pre {
-    /* Ensure code blocks use the mono font (Geist Mono) with fallbacks */
-    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border-secondary);
-    border-radius: var(--radius-sm);
-  }
-
-  code {
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--font-size-sm);
-  }
-
-  pre {
-    padding: var(--space-4);
-    overflow-x: auto;
-  }
-
-  pre code {
-    background: none;
-    border: none;
-    padding: 0;
+    background: rgba(57, 189, 248, 0.55);
   }
 }
 
-@layer utilities {
-  /* ============================================================================
-   * CRYPTO UI COMPONENTS
-   * ============================================================================ */
+@layer components {
+  .panel-shell {
+    background: linear-gradient(160deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95));
+    border-radius: var(--radius);
+    border: 1px solid var(--surface-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-panel);
+  }
 
-  /* Buttons with Neon Glow Effects */
-  .btn {
+  .panel-inner {
+    background: linear-gradient(160deg, rgba(15, 23, 42, 0.75), rgba(11, 16, 26, 0.95));
+    border-radius: calc(var(--radius) - 6px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .neo-button {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-md);
-    font-weight: var(--font-weight-medium);
-    transition: all var(--duration-200) var(--ease-out);
-    cursor: pointer;
-    border: none;
-    text-decoration: none;
-    user-select: none;
+    padding: 0.55rem 1.25rem;
+    border-radius: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.4));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 18px rgba(0, 0, 0, 0.45);
+    transition: transform 120ms ease, box-shadow 180ms ease, border-color 120ms ease;
   }
 
-  .btn-primary {
-    background: var(--color-primary);
-    color: var(--color-text-inverse);
-    padding: var(--button-padding-md);
-    height: var(--button-height-md);
-    box-shadow: var(--glow-primary-sm), var(--shadow-md);
-    border: 1px solid var(--color-primary);
-  }
-
-  .btn-primary:hover {
-    background: var(--color-primary-light);
-    box-shadow: var(--glow-primary-md), var(--shadow-lg);
-    transform: translateY(-1px);
-  }
-
-  .btn-primary:active {
-    transform: translateY(0);
-    box-shadow: var(--glow-primary-sm), var(--shadow-base);
-  }
-
-  .btn-secondary {
-    background: var(--color-bg-tertiary);
-    color: var(--color-text-primary);
-    padding: var(--button-padding-md);
-    height: var(--button-height-md);
-    border: 1px solid var(--color-border-primary);
-    box-shadow: var(--shadow-base);
-  }
-
-  .btn-secondary:hover {
-    background: var(--color-bg-elevated);
-    border-color: var(--color-primary);
-    box-shadow: var(--glow-primary-sm), var(--shadow-md);
-    transform: translateY(-1px);
-  }
-
-  .btn-danger {
-    background: var(--color-danger);
-    color: var(--color-text-primary);
-    padding: var(--button-padding-md);
-    height: var(--button-height-md);
-    box-shadow: var(--glow-danger-sm), var(--shadow-md);
-    border: 1px solid var(--color-danger);
-  }
-
-  .btn-danger:hover {
-    background: var(--color-danger-dark);
-    box-shadow: var(--glow-danger-md), var(--shadow-lg);
-    transform: translateY(-1px);
-  }
-
-  .btn-success {
-    background: var(--color-success);
-    color: var(--color-text-inverse);
-    padding: var(--button-padding-md);
-    height: var(--button-height-md);
-    box-shadow: var(--glow-success-sm), var(--shadow-md);
-    border: 1px solid var(--color-success);
-  }
-
-  .btn-success:hover {
-    background: var(--color-success-dark);
-    box-shadow: var(--glow-success-md), var(--shadow-lg);
-    transform: translateY(-1px);
-  }
-
-  /* Cards with Glassmorphism */
-  .card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border-primary);
-    border-radius: var(--radius-lg);
-    padding: var(--card-padding-md);
-    box-shadow: var(--shadow-lg);
-    transition: all var(--duration-300) var(--ease-out);
-  }
-
-  .card-glass {
-    background: var(--color-bg-glass);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-lg);
-    padding: var(--card-padding-md);
-    box-shadow: var(--shadow-xl);
-    transition: all var(--duration-300) var(--ease-out);
-  }
-
-  .card-glass:hover {
-    border-color: var(--color-border-glow);
-    box-shadow: var(--glow-primary-sm), var(--shadow-2xl);
-    transform: translateY(-2px);
-  }
-
-  .card-elevated {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border-secondary);
-    border-radius: var(--radius-lg);
-    padding: var(--card-padding-md);
-    box-shadow: var(--shadow-xl);
-  }
-
-  /* Form Elements with Crypto Styling */
-  .input {
-    width: 100%;
-    height: var(--input-height-md);
-    padding: var(--input-padding-md);
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border-primary);
-    border-radius: var(--radius-md);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-base);
-    transition: all var(--duration-200) var(--ease-out);
-  }
-
-  .input:focus {
-    border-color: var(--color-primary);
-    box-shadow: var(--glow-primary-sm);
-    background: var(--color-bg-elevated);
-  }
-
-  .input::placeholder {
-    color: var(--color-text-muted);
-  }
-
-  /* Navigation Elements */
-  .nav {
-    background: var(--color-bg-glass);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-border-secondary);
-    height: var(--nav-height);
-  }
-
-  .nav-item {
-    color: var(--color-text-secondary);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    transition: all var(--duration-200) var(--ease-out);
-    text-decoration: none;
-  }
-
-  .nav-item:hover {
-    color: var(--color-primary);
-    background: var(--color-bg-tertiary);
-    text-shadow: var(--glow-primary-sm);
-  }
-
-  .nav-item.active {
-    color: var(--color-primary);
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border-accent);
-    box-shadow: var(--glow-primary-sm);
-  }
-
-  /* Loading States with Glow */
-  .loading {
-    @apply animate-pulse;
-    background: linear-gradient(
-      90deg,
-      var(--color-bg-secondary) 25%,
-      var(--color-bg-tertiary) 50%,
-      var(--color-bg-secondary) 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  /* Chart Container */
-  .chart-container {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border-primary);
-    border-radius: var(--radius-lg);
-    padding: var(--space-6);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .chart-container::before {
-    content: '';
+  .neo-button::after {
+    content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-      135deg,
-      transparent 0%,
-      rgba(0, 255, 204, 0.02) 50%,
-      transparent 100%
-    );
-    pointer-events: none;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+    opacity: 0;
+    transition: opacity 200ms ease;
   }
 
-  /* Modal/Overlay */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--color-bg-overlay);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    z-index: var(--z-modal);
+  .neo-button:hover {
+    transform: translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 12px 28px rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+
+  .neo-button:hover::after {
+    opacity: 1;
+  }
+
+  .neo-button[data-variant="primary"] {
+    background: linear-gradient(180deg, rgba(255, 155, 70, 0.95), rgba(255, 120, 45, 0.6));
+    border-color: rgba(255, 157, 75, 0.65);
+    color: #0b0f17;
+    text-shadow: 0 0 18px rgba(255, 148, 95, 0.7);
+  }
+
+  .neo-button[data-variant="danger"] {
+    background: linear-gradient(180deg, rgba(251, 113, 133, 0.95), rgba(185, 59, 93, 0.65));
+    border-color: rgba(251, 113, 133, 0.55);
+    color: #080c14;
+    text-shadow: 0 0 14px rgba(251, 113, 133, 0.7);
+  }
+
+  .neo-button[data-variant="secondary"] {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.45));
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
+  }
+
+  .neo-button[data-variant="outline"] {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.6));
+    border-color: rgba(148, 163, 184, 0.35);
+    color: #e2e8f0;
+  }
+
+  .neo-button[data-variant="ghost"] {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.5));
+    border-color: rgba(148, 163, 184, 0.1);
+    color: #cbd5f5;
+  }
+
+  .status-indicator {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(15, 23, 42, 0.75));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 10px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .status-indicator::before {
+    content: "";
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgba(63, 247, 178, 0.9), rgba(16, 185, 129, 0.8));
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.85);
+  }
+
+  .status-indicator[data-state="inactive"]::before {
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.65), rgba(75, 85, 99, 0.6));
+    box-shadow: none;
+  }
+
+  .status-indicator[data-state="error"]::before {
+    background: linear-gradient(180deg, rgba(251, 113, 133, 0.85), rgba(220, 38, 38, 0.7));
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.55);
+  }
+
+  .control-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    padding: 0.45rem 0.8rem;
+    border-radius: 14px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(226, 232, 240, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.75), rgba(2, 6, 23, 0.92));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 12px rgba(2, 6, 23, 0.45);
+    transition: transform 120ms ease, border 160ms ease, box-shadow 160ms ease;
+  }
+
+  .control-chip[data-active="true"] {
+    color: #f8fafc;
+    border-color: rgba(255, 255, 255, 0.28);
+    background: linear-gradient(180deg, rgba(62, 84, 120, 0.95), rgba(3, 7, 18, 0.85));
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .dashboard-shell {
+    border-radius: calc(var(--radius) + 8px);
+    padding: clamp(1.5rem, 3vw, 2.75rem);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.02), rgba(15, 23, 42, 0.85));
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 50px rgba(2, 6, 23, 0.65);
+  }
+
+  .dial-shell {
+    position: relative;
+    width: clamp(220px, 26vw, 280px);
+    height: clamp(220px, 26vw, 280px);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.08), transparent 55%),
+      conic-gradient(from 260deg, rgba(255, 139, 61, 0.4) 0deg, rgba(255, 139, 61, 0.05) 120deg, rgba(57, 189, 248, 0.05) 240deg, rgba(255, 139, 61, 0.35) 360deg),
+      linear-gradient(180deg, rgba(31, 41, 59, 0.95), rgba(3, 7, 18, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 10px 24px rgba(0, 0, 0, 0.65), 0 24px 48px rgba(2, 6, 23, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  .modal {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border-primary);
-    border-radius: var(--radius-xl);
-    padding: var(--space-8);
-    box-shadow: var(--shadow-2xl), var(--glow-primary-sm);
-    max-width: 90vw;
-    max-height: 90vh;
-    overflow: auto;
+  .dial-shell::after {
+    content: "";
+    position: absolute;
+    inset: 12%;
+    border-radius: inherit;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.08), rgba(17, 24, 39, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
-  /* Tooltips */
-  .tooltip {
-    background: var(--color-bg-elevated);
-    color: var(--color-text-primary);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    box-shadow: var(--shadow-lg), var(--glow-primary-sm);
-    border: 1px solid var(--color-border-glow);
-    z-index: var(--z-tooltip);
+  .dial-core {
+    position: relative;
+    z-index: 1;
+    width: 55%;
+    height: 55%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 139, 61, 0.85), rgba(31, 41, 59, 0.9));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.45), 0 0 22px rgba(255, 139, 61, 0.4);
   }
 
-  /* Mobile-optimized touch targets */
-  .touch-target {
-    @apply min-h-[44px] min-w-[44px];
-  }
-
-  /* Enhanced slider for touch devices */
-  .touch-slider {
-    @apply h-8;
-  }
-
-  .touch-slider [role="slider"] {
-    @apply h-6 w-6;
-    background: var(--color-primary);
-    border: 2px solid var(--color-primary);
-    box-shadow: var(--glow-primary-sm);
-  }
-
-  /* Prevent text selection on interactive elements */
-  .select-none {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-
-  /* Mobile Responsive Enhancements */
-  @media (max-width: 768px) {
-    html {
-      scroll-behavior: smooth;
-      -webkit-overflow-scrolling: touch;
-      touch-action: manipulation;
-    }
-
-    body {
-      overscroll-behavior: contain;
-      touch-action: manipulation;
-    }
-
-    /* Better tap highlight with crypto colors */
-    button, [role="button"], [role="slider"] {
-      -webkit-tap-highlight-color: rgba(0, 255, 204, 0.2);
-    }
-
-    /* Prevent zoom on input focus */
-    input, select, textarea {
-      font-size: 16px;
-    }
-
-    /* Optimize form elements for touch with glow */
-    input[type="range"] {
-      -webkit-appearance: none;
-      height: 44px;
-      background: var(--color-bg-tertiary);
-      border-radius: var(--radius-full);
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 24px;
-      width: 24px;
-      border-radius: 50%;
-      background: var(--color-primary);
-      border: 2px solid var(--color-primary);
-      cursor: pointer;
-      box-shadow: var(--glow-primary-sm);
-    }
-
-    /* Mobile card spacing */
-    .card,
-    .card-glass,
-    .card-elevated {
-      margin: var(--space-4);
-      padding: var(--space-4);
-    }
-
-    /* Mobile button sizing */
-    .btn {
-      min-height: 44px;
-      padding: var(--space-3) var(--space-6);
-    }
-  }
-
-  /* Pull-to-refresh indicator spacing */
-  .safe-top {
-    padding-top: env(safe-area-inset-top);
-  }
-
-  .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  /* Enhanced Animation utilities */
-  .animate-in {
-    animation-fill-mode: both;
-  }
-
-  .slide-in-from-top-2 {
-    animation: slide-in-from-top-2 0.3s ease-out;
-  }
-
-  @keyframes slide-in-from-top-2 {
-    from {
-      transform: translateY(-8px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  /* Crypto-specific animations */
-  .glow-pulse {
-    animation: glow-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes glow-pulse {
-    0%, 100% {
-      box-shadow: var(--glow-primary-sm);
-    }
-    50% {
-      box-shadow: var(--glow-primary-md);
-    }
-  }
-
-  .fade-in-up {
-    animation: fade-in-up var(--duration-500) var(--ease-out);
-  }
-
-  @keyframes fade-in-up {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .dial-ticks {
+    position: absolute;
+    inset: 8%;
+    border-radius: inherit;
+    background: conic-gradient(rgba(255, 255, 255, 0.16) 0.5deg, transparent 6deg);
+    opacity: 0.25;
   }
 }
-/* ============================================================================
- * ADDITIONAL CRYPTO UI UTILITIES
- * ============================================================================ */
 
-/* Interactive Elements */
-.focus-ring {
-  @apply focus:outline-none;
-  box-shadow: 0 0 0 2px var(--color-primary), var(--glow-primary-sm);
-}
+@layer utilities {
+  .surface-grid {
+    display: grid;
+    gap: clamp(1.25rem, 2vw, 2rem);
+  }
 
-.card-interactive {
-  @apply transition-all;
-  transition-duration: var(--duration-200);
-  cursor: pointer;
-}
+  .surface-tile {
+    background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(11, 16, 26, 0.92));
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 28px rgba(2, 6, 23, 0.55);
+  }
 
-.card-interactive:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-xl), var(--glow-primary-sm);
-}
+  .divider-glow {
+    position: relative;
+    overflow: hidden;
+  }
 
-.card-interactive:active {
-  transform: translateY(0);
-  transition-duration: var(--duration-75);
-}
-
-/* Error States with Neon */
-.error-shake {
-  animation: error-shake 0.5s ease-in-out;
-}
-
-@keyframes error-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
-}
-
-.error-border {
-  border-color: var(--color-danger) !important;
-  box-shadow: var(--glow-danger-sm) !important;
-}
-
-.success-border {
-  border-color: var(--color-success) !important;
-  box-shadow: var(--glow-success-sm) !important;
-}
-
-/* Status Indicators */
-.status-online {
-  color: var(--color-success);
-  text-shadow: var(--glow-success-sm);
-}
-
-.status-offline {
-  color: var(--color-text-muted);
-}
-
-.status-error {
-  color: var(--color-danger);
-  text-shadow: var(--glow-danger-sm);
-}
-
-.status-warning {
-  color: var(--color-warning);
-  text-shadow: var(--glow-warning-sm);
-}
-
-/* Price Movement Indicators */
-.price-up {
-  color: var(--color-success);
-  text-shadow: var(--glow-success-sm);
-}
-
-.price-down {
-  color: var(--color-danger);
-  text-shadow: var(--glow-danger-sm);
-}
-
-.price-neutral {
-  color: var(--color-text-secondary);
-}
-
-/* Data Tables */
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 1px solid var(--color-border-primary);
-}
-
-.table th {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--color-border-primary);
-}
-
-.table td {
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--color-border-secondary);
-  color: var(--color-text-primary);
-  font-family: var(--font-family-mono);
-}
-
-.table tr:hover {
-  background: var(--color-bg-tertiary);
-}
-
-.table tr:last-child td {
-  border-bottom: none;
-}
-
-/* Badges */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-}
-
-.badge-primary {
-  background: rgba(var(--color-primary-rgb), 0.2);
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  text-shadow: var(--glow-primary-sm);
-}
-
-.badge-success {
-  background: rgba(var(--color-success-rgb), 0.2);
-  color: var(--color-success);
-  border: 1px solid var(--color-success);
-}
-
-.badge-danger {
-  background: rgba(var(--color-danger-rgb), 0.2);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-}
-
-.badge-warning {
-  background: rgba(var(--color-warning-rgb), 0.2);
-  color: var(--color-warning);
-  border: 1px solid var(--color-warning);
-}
-
-/* Mobile Enhancements */
-.mobile-loading {
-  @apply animate-pulse;
-  background: linear-gradient(
-    90deg,
-    var(--color-bg-secondary) 25%,
-    var(--color-bg-tertiary) 50%,
-    var(--color-bg-secondary) 75%
-  );
-  background-size: 200% 100%;
-  animation: loading-shimmer 2s infinite ease-in-out;
-}
-
-.thumb-zone {
-  @apply min-h-[44px] min-w-[44px] p-3;
-  border-radius: var(--radius-lg);
-  transition: all var(--duration-200) var(--ease-out);
-}
-
-.thumb-zone:active {
-  background: var(--color-bg-tertiary);
-  transform: scale(0.95);
-}
-
-.mobile-full-width {
-  width: calc(100vw - 2rem);
-  margin-left: calc(-50vw + 50% + 1rem);
-}
-
-/* Utility Classes */
-.text-glow {
-  text-shadow: var(--glow-primary-sm);
-}
-
-.border-glow {
-  border-color: var(--color-primary);
-  box-shadow: var(--glow-primary-sm);
-}
-
-.bg-glass {
-  background: var(--color-bg-glass);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.transition-crypto {
-  transition: all var(--duration-300) var(--ease-cyber);
+  .divider-glow::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.5), transparent);
+  }
 }

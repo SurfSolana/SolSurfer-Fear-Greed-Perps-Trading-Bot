@@ -80,18 +80,18 @@ export function NumberInput({
 
   return (
     <div className={cn(
-      'group flex items-stretch rounded-md font-semibold border w-fit mx-auto bg-background',
+      'group flex items-stretch overflow-hidden rounded-xl border border-white/12 bg-white/5 font-semibold backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] w-fit mx-auto',
       sizeClasses[size],
       className
     )}>
       <button
         aria-hidden
         tabIndex={-1}
-        className='flex items-center pl-[.5em] pr-[.325em] hover:bg-muted/50 transition-colors'
+        className='flex items-center justify-center px-3 transition-colors bg-white/5 hover:bg-white/10'
         disabled={min != null && value <= min}
         onPointerDown={handlePointerDown(-1)}
       >
-        <Minus className={cn(iconSizes[size], 'text-muted-foreground')} absoluteStrokeWidth strokeWidth={3.5} />
+        <Minus className={cn(iconSizes[size], 'text-slate-300')} absoluteStrokeWidth strokeWidth={3.5} />
       </button>
       <div className="relative grid items-center justify-items-center text-center [grid-template-areas:'overlap'] *:[grid-area:overlap]">
         <input
@@ -127,11 +127,11 @@ export function NumberInput({
       <button
         aria-hidden
         tabIndex={-1}
-        className='flex items-center pl-[.325em] pr-[.5em] hover:bg-muted/50 transition-colors'
+        className='flex items-center justify-center px-3 transition-colors bg-white/5 hover:bg-white/10'
         disabled={max != null && value >= max}
         onPointerDown={handlePointerDown(1)}
       >
-        <Plus className={cn(iconSizes[size], 'text-muted-foreground')} absoluteStrokeWidth strokeWidth={3.5} />
+        <Plus className={cn(iconSizes[size], 'text-slate-300')} absoluteStrokeWidth strokeWidth={3.5} />
       </button>
     </div>
   );

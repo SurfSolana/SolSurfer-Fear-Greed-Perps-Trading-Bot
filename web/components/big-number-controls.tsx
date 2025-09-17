@@ -106,266 +106,202 @@ export function BigNumberControls({
     ? 'Long > '
     : 'Short > '
 
+  const totalReturn = Number(backtestResult?.totalReturn ?? 0)
+  const sharpeRatio = Number(backtestResult?.sharpeRatio ?? 0)
+  const maxDrawdown = Number(backtestResult?.maxDrawdown ?? 0)
+  const winRateValue = Number(backtestResult?.winRate ?? 0)
+  const totalTrades = Number(backtestResult?.totalTrades ?? 0)
+  const timeInMarket = Number(backtestResult?.timeInMarket ?? 0)
+  const liquidations = Number(backtestResult?.liquidations ?? 0)
+  const projectedNet = projectedBalance + estimatedPnL
+
   return (
-    <div className={`bg-card border border-border rounded-xl p-8 ${className}`}>
-      {/* Top Controls Row: Asset, Strategy, Interval */}
-      <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
-        {/* Asset Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Token:</span>
-          <Select value={asset} onValueChange={handleAssetChange}>
-            <SelectTrigger className="w-24 h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="SOL">SOL</SelectItem>
-              <SelectItem value="ETH">ETH</SelectItem>
-              <SelectItem value="BTC">BTC</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className={`panel-shell p-4 ${className}`}>
+      <div className="panel-inner rounded-[calc(var(--radius)-6px)] px-6 py-6 space-y-8">
+        <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-[0.6rem] uppercase tracking-[0.3em] text-muted-foreground">Token</span>
+            <Select value={asset} onValueChange={handleAssetChange}>
+              <SelectTrigger className="w-24 rounded-md border border-white/10 bg-transparent px-3 py-1.5 font-mono font-semibold text-white hover:bg-white/5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SOL">SOL</SelectItem>
+                <SelectItem value="ETH">ETH</SelectItem>
+                <SelectItem value="BTC">BTC</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Strategy Toggle */}
-        <ToggleSwitch
-          checked={strategy === 'contrarian'}
-          onCheckedChange={handleStrategyChange}
-          leftLabel="Momentum"
-          rightLabel="Contrarian"
-        />
+          <ToggleSwitch
+            checked={strategy === 'contrarian'}
+            onCheckedChange={handleStrategyChange}
+            leftLabel="Momentum"
+            rightLabel="Contrarian"
+            className="h-8 w-16 border border-white/10 bg-white/10 data-[state=checked]:bg-[#a78bfa]/40"
+          />
 
-        {/* Interval Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Interval:</span>
-          <Select value={dataInterval} onValueChange={(v) => onDataIntervalChange(v as '15min' | '1h' | '4h')}>
-            <SelectTrigger className="w-24 h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15min">15 min</SelectItem>
-              <SelectItem value="1h">1 hour</SelectItem>
-              <SelectItem value="4h">4 hours</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Top row: Trading controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center mb-8">
-
-        {/* Left: Short/Long Threshold based on strategy */}
-        <div className="flex flex-col items-center space-y-4">
-          <div className="text-center">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              {shortLabel}
-            </h3>
-            <div className="mb-4">
-              <NumberInput
-                value={lowThreshold}
-                min={0}
-                max={highThreshold - 1}
-                onChange={handleLowThresholdChange}
-                size="xl"
-                className={strategy === 'momentum' ? "text-red-400 font-bold font-mono" : "text-green-400 font-bold font-mono"}
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[0.6rem] uppercase tracking-[0.3em] text-muted-foreground">Interval</span>
+            <Select value={dataInterval} onValueChange={(v) => onDataIntervalChange(v as '15min' | '1h' | '4h')}>
+              <SelectTrigger className="w-28 rounded-md border border-white/10 bg-transparent px-3 py-1.5 font-mono font-semibold text-[#60a5fa] hover:bg-white/5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15min">15 min</SelectItem>
+                <SelectItem value="1h">1 hour</SelectItem>
+                <SelectItem value="4h">4 hours</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Center: Leverage */}
-        <div className="flex flex-col items-center space-y-4">
-          <div className="text-center">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Leverage
-            </h3>
-            <div className="mb-4">
-              <NumberInput
-                value={leverage}
-                min={1}
-                max={10}
-                onChange={handleLeverageChange}
-                size="xl"
-                className="text-fuchsia-400 font-bold font-mono"
-                suffix="x"
-              />
-            </div>
-            <div className={`text-xs font-medium ${
-              leverage >= 8 ? 'text-red-400' : leverage >= 5 ? 'text-yellow-400' : 'text-muted-foreground'
-            }`}>
-              {leverage >= 8 ? 'HIGH RISK' : leverage >= 5 ? 'MODERATE RISK' : 'LOW RISK'}
-            </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(240px,340px)_minmax(0,1fr)] items-center">
+          <div className="surface-tile px-6 py-6 flex flex-col items-center gap-4 text-center">
+            <p className="text-[0.6rem] uppercase tracking-[0.32em] text-muted-foreground">{shortLabel}FGI</p>
+            <NumberInput
+              value={lowThreshold}
+              min={0}
+              max={highThreshold - 1}
+              onChange={handleLowThresholdChange}
+              size="xl"
+              className={strategy === 'momentum' ? 'text-[#fb7185]' : 'text-[#34d399]'}
+            />
+            <p className="text-xs text-muted-foreground">Auto entry trigger</p>
           </div>
-        </div>
 
-        {/* Right: Long/Short Threshold based on strategy */}
-        <div className="flex flex-col items-center space-y-4">
-          <div className="text-center">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              {longLabel}
-            </h3>
-            <div className="mb-4">
-              <NumberInput
-                value={highThreshold}
-                min={lowThreshold + 1}
-                max={100}
-                onChange={handleHighThresholdChange}
-                size="xl"
-                className={strategy === 'momentum' ? "text-green-400 font-bold font-mono" : "text-red-400 font-bold font-mono"}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Strategy Carousel - moved here */}
-      {children}
-
-      {/* Bottom: P&L Display and Metrics */}
-      <div className="border-t border-border pt-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: P&L Display */}
-          <div className="flex flex-col items-center space-y-4">
-            <div className="text-center">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Estimated 30 Day P&L
-              </h3>
-              <div className={`text-5xl font-bold font-mono mb-2 ${
-                performancePercentage >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}>
+          <div className="relative flex items-center justify-center">
+            <div className="dial-shell">
+              <div className="dial-ticks" />
+              <div className="dial-core text-center text-black">
+                <span className="text-[0.55rem] uppercase tracking-[0.35em] text-black/70">Projected</span>
                 <NumberFlow
-                  value={performancePercentage}
-                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  prefix={performancePercentage >= 0 ? '+' : ''}
-                  suffix="%"
+                  value={projectedNet}
+                  format={{ style: 'currency', currency: 'USD', maximumFractionDigits: 0 }}
                 />
-              </div>
-              <div className="text-lg font-mono text-muted-foreground">
-                <NumberFlow
-                  value={estimatedPnL}
-                  format={{ style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  prefix={estimatedPnL >= 0 ? '+' : ''}
-                />
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">
-                Projected balance: <NumberFlow
-                  value={projectedBalance + estimatedPnL}
-                  format={{ style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                  className="inline"
-                />
+                <span className="text-[0.55rem] uppercase tracking-[0.35em] text-black/60">Balance</span>
+                <span className={`text-xs font-mono ${estimatedPnL >= 0 ? 'text-[#dcfce7]' : 'text-[#fecdd3]' }`}>
+                  <NumberFlow
+                    value={estimatedPnL}
+                    format={{ style: 'currency', currency: 'USD', maximumFractionDigits: 2 }}
+                    prefix={estimatedPnL >= 0 ? '+' : ''}
+                  />
+                </span>
               </div>
             </div>
-
-            {/* Performance Indicator */}
-            <div className="flex items-center gap-2 text-xs">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${
-                performancePercentage >= 10 ? 'bg-green-400' :
-                performancePercentage >= 5 ? 'bg-yellow-400' :
-                performancePercentage >= 0 ? 'bg-blue-400' :
-                performancePercentage >= -5 ? 'bg-orange-400' : 'bg-red-400'
-              }`}></div>
-              <span className="text-muted-foreground">
-                {performancePercentage >= 10 ? 'Excellent' :
-                 performancePercentage >= 5 ? 'Good' :
-                 performancePercentage >= 0 ? 'Positive' :
-                 performancePercentage >= -5 ? 'Caution' : 'High Risk'}
+            <div className="absolute -bottom-10 flex items-center gap-4 text-[0.58rem] font-semibold uppercase tracking-[0.32em] text-muted-foreground">
+              <span className={
+                leverage >= 8 ? 'text-[#fb7185]' : leverage >= 5 ? 'text-[#facc15]' : 'text-[#34d399]'
+              }>
+                {leverage}x Risk
               </span>
-            </div>
-
-            {/* Neutral zone indicator */}
-            <div className="text-xs text-muted-foreground text-center">
-              Neutral zone: {lowThreshold} - {highThreshold}
+              <span className="text-[#22d3ee]">{strategy.toUpperCase()}</span>
             </div>
           </div>
 
-          {/* Right: Backtest Metrics */}
-          <div className="bg-black/30 rounded-lg p-6 border border-border/50">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
-              Backtest Metrics
-            </h3>
+          <div className="surface-tile px-6 py-6 flex flex-col items-center gap-4 text-center">
+            <p className="text-[0.6rem] uppercase tracking-[0.32em] text-muted-foreground">{longLabel}FGI</p>
+            <NumberInput
+              value={highThreshold}
+              min={lowThreshold + 1}
+              max={100}
+              onChange={handleHighThresholdChange}
+              size="xl"
+              className={strategy === 'momentum' ? 'text-[#34d399]' : 'text-[#fb7185]'}
+            />
+            <p className="text-xs text-muted-foreground">Profit capture trigger</p>
+          </div>
+        </div>
+
+        {children && (
+          <div className="surface-tile px-4 py-4">
+            {children}
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="surface-tile px-4 py-4">
+            <p className="text-[0.6rem] uppercase tracking-[0.32em] text-muted-foreground">Estimated 30d P&L</p>
+            <div className={`mt-3 text-3xl font-mono font-semibold ${
+              performancePercentage >= 0 ? 'text-[#34d399]' : 'text-[#fb7185]'
+            }`}>
+              <NumberFlow
+                value={performancePercentage}
+                format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
+                prefix={performancePercentage >= 0 ? '+' : ''}
+                suffix="%"
+              />
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Neutral zone {lowThreshold} - {highThreshold}
+            </p>
+          </div>
+
+          <div className="surface-tile px-4 py-4">
+            <p className="text-[0.6rem] uppercase tracking-[0.32em] text-muted-foreground">Backtest Pulse</p>
             {backtestResult ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Total Return</div>
-                  <div className={`text-lg font-mono font-semibold ${
-                    backtestResult.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground uppercase tracking-[0.25em]">Total</span>
+                  <span className={`font-mono font-semibold ${totalReturn >= 0 ? 'text-[#34d399]' : 'text-[#fb7185]' }`}>
+                    <NumberFlow value={totalReturn} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground uppercase tracking-[0.25em]">Sharpe</span>
+                  <span className={`font-mono font-semibold ${
+                    sharpeRatio > 1 ? 'text-[#34d399]' : sharpeRatio > 0 ? 'text-[#facc15]' : 'text-[#fb7185]'
                   }`}>
-                    <NumberFlow
-                      value={backtestResult.totalReturn}
-                      format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
-                      suffix="%"
-                    />
-                  </div>
+                    <NumberFlow value={sharpeRatio} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} />
+                  </span>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Sharpe Ratio</div>
-                  <div className={`text-lg font-mono font-semibold ${
-                    backtestResult.sharpeRatio > 1 ? 'text-green-400' :
-                    backtestResult.sharpeRatio > 0 ? 'text-yellow-400' : 'text-red-400'
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground uppercase tracking-[0.25em]">Drawdown</span>
+                  <span className="font-mono font-semibold text-[#fb7185]">
+                    <NumberFlow value={-Math.abs(maxDrawdown)} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground italic">Backtest data loading…</p>
+            )}
+          </div>
+
+          <div className="surface-tile px-4 py-4">
+            <p className="text-[0.6rem] uppercase tracking-[0.32em] text-muted-foreground">Execution</p>
+            {backtestResult ? (
+              <div className="mt-3 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground uppercase tracking-[0.25em]">Win</span>
+                  <span className={`font-mono font-semibold ${
+                    winRateValue >= 60 ? 'text-[#34d399]' : winRateValue >= 40 ? 'text-[#facc15]' : 'text-[#fb7185]'
                   }`}>
-                    <NumberFlow
-                      value={backtestResult.sharpeRatio}
-                      format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                    />
-                  </div>
+                    <NumberFlow value={winRateValue} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
+                  </span>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Max Drawdown</div>
-                  <div className="text-lg font-mono font-semibold text-red-400">
-                    <NumberFlow
-                      value={-Math.abs(backtestResult.maxDrawdown)}
-                      format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
-                      suffix="%"
-                    />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground uppercase tracking-[0.25em]">Trades</span>
+                  <span className="font-mono font-semibold text-[#38bdf8]">
+                    <NumberFlow value={totalTrades} format={{ maximumFractionDigits: 0 }} />
+                  </span>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Win Rate</div>
-                  <div className={`text-lg font-mono font-semibold ${
-                    backtestResult.winRate >= 60 ? 'text-green-400' :
-                    backtestResult.winRate >= 40 ? 'text-yellow-400' : 'text-red-400'
-                  }`}>
-                    <NumberFlow
-                      value={backtestResult.winRate}
-                      format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
-                      suffix="%"
-                    />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground uppercase tracking-[0.25em]">Exposure</span>
+                  <span className="font-mono font-semibold text-[#60a5fa]">
+                    <NumberFlow value={timeInMarket} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} suffix="%" />
+                  </span>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Total Trades</div>
-                  <div className="text-lg font-mono font-semibold text-cyan-400">
-                    <NumberFlow
-                      value={backtestResult.totalTrades}
-                      format={{ minimumFractionDigits: 0, maximumFractionDigits: 0 }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Time in Market</div>
-                  <div className="text-lg font-mono font-semibold text-blue-400">
-                    <NumberFlow
-                      value={backtestResult.timeInMarket}
-                      format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
-                      suffix="%"
-                    />
-                  </div>
-                </div>
-                {backtestResult.liquidations > 0 && (
-                  <div className="col-span-2">
-                    <div className="text-xs text-muted-foreground mb-1">Liquidations</div>
-                    <div className="text-lg font-mono font-semibold text-red-500">
-                      <NumberFlow
-                        value={backtestResult.liquidations}
-                        format={{ minimumFractionDigits: 0, maximumFractionDigits: 0 }}
-                      />
-                      <span className="text-xs text-red-400 ml-2">⚠️ High Risk</span>
-                    </div>
+                {liquidations > 0 && (
+                  <div className="flex items-center justify-between text-[#fb7185]">
+                    <span className="uppercase tracking-[0.25em]">Liquidations</span>
+                    <span className="font-mono font-semibold">
+                      <NumberFlow value={liquidations} format={{ maximumFractionDigits: 0 }} />
+                    </span>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground italic">
-                Loading backtest data...
-              </div>
+              <p className="mt-3 text-sm text-muted-foreground italic">Awaiting metrics…</p>
             )}
           </div>
         </div>

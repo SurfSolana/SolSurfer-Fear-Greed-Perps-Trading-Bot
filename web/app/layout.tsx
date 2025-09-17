@@ -46,7 +46,7 @@ export default function RootLayout({
         <link rel="apple-touch-startup-image" href="/icon-512.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased dark bg-gray-900 text-gray-100`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <ErrorBoundary level="global">
           {children}
