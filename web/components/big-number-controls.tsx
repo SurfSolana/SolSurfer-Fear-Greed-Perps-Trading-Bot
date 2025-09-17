@@ -4,11 +4,14 @@ import { useState, useCallback, useEffect } from 'react'
 import { TradingParameters } from '@/lib/types'
 import { NumberInput } from '@/components/ui/number-input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import NumberFlow from '@number-flow/react'
 
 interface BigNumberControlsProps {
   parameters: TradingParameters
   onParametersChange: (params: TradingParameters) => void
+  dataInterval: '15min' | '1h' | '4h'
+  onDataIntervalChange: (interval: '15min' | '1h' | '4h') => void
   estimatedPnL?: number
   projectedBalance?: number
   backtestResult?: any
@@ -19,6 +22,8 @@ interface BigNumberControlsProps {
 export function BigNumberControls({
   parameters,
   onParametersChange,
+  dataInterval,
+  onDataIntervalChange,
   estimatedPnL = 0,
   projectedBalance = 10000,
   backtestResult = null,
@@ -29,6 +34,7 @@ export function BigNumberControls({
   const [highThreshold, setHighThreshold] = useState(parameters.highThreshold ?? 75)
   const [leverage, setLeverage] = useState(parameters.leverage || 3)
   const [strategy, setStrategy] = useState<'momentum' | 'contrarian'>(parameters.strategy || 'momentum')
+  const [asset, setAsset] = useState<'SOL' | 'ETH' | 'BTC'>(parameters.asset as 'SOL' | 'ETH' | 'BTC' || 'ETH')
 
   // Update local state when parameters change externally
   useEffect(() => {
@@ -36,7 +42,8 @@ export function BigNumberControls({
     setHighThreshold(parameters.highThreshold ?? 75)
     setLeverage(parameters.leverage || 3)
     setStrategy(parameters.strategy || 'momentum')
-  }, [parameters.lowThreshold, parameters.highThreshold, parameters.leverage, parameters.strategy])
+    setAsset(parameters.asset as 'SOL' | 'ETH' | 'BTC' || 'ETH')
+  }, [parameters.lowThreshold, parameters.highThreshold, parameters.leverage, parameters.strategy, parameters.asset])
 
   // Handle low threshold changes (must be below high)
   const handleLowThresholdChange = useCallback((newVal: number) => {
@@ -77,6 +84,16 @@ export function BigNumberControls({
     })
   }, [parameters, onParametersChange])
 
+  // Handle asset change
+  const handleAssetChange = useCallback((newAsset: string) => {
+    const typedAsset = newAsset as 'SOL' | 'ETH' | 'BTC'
+    setAsset(typedAsset)
+    onParametersChange({
+      ...parameters,
+      asset: typedAsset
+    })
+  }, [parameters, onParametersChange])
+
   // Calculate estimated performance
   const performancePercentage = projectedBalance > 0 ? (estimatedPnL / projectedBalance) * 100 : 0
 
@@ -91,14 +108,45 @@ export function BigNumberControls({
 
   return (
     <div className={`bg-card border border-border rounded-xl p-8 ${className}`}>
-      {/* Strategy Toggle */}
-      <div className="flex justify-center mb-6">
+      {/* Top Controls Row: Asset, Strategy, Interval */}
+      <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
+        {/* Asset Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Token:</span>
+          <Select value={asset} onValueChange={handleAssetChange}>
+            <SelectTrigger className="w-24 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="SOL">SOL</SelectItem>
+              <SelectItem value="ETH">ETH</SelectItem>
+              <SelectItem value="BTC">BTC</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Strategy Toggle */}
         <ToggleSwitch
           checked={strategy === 'contrarian'}
           onCheckedChange={handleStrategyChange}
           leftLabel="Momentum"
           rightLabel="Contrarian"
         />
+
+        {/* Interval Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Interval:</span>
+          <Select value={dataInterval} onValueChange={(v) => onDataIntervalChange(v as '15min' | '1h' | '4h')}>
+            <SelectTrigger className="w-24 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15min">15 min</SelectItem>
+              <SelectItem value="1h">1 hour</SelectItem>
+              <SelectItem value="4h">4 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Top row: Trading controls */}

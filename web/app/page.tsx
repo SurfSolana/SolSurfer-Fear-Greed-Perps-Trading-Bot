@@ -7,6 +7,7 @@ import { BigNumberControls } from '@/components/big-number-controls'
 import { StrategyCarousel } from '@/components/strategy-carousel'
 import { Button } from '@/components/ui/button'
 import { BacktestEquityChart } from '@/components/backtest-equity-chart'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface RollingEquityPoint {
   timestamp: string
@@ -259,6 +260,14 @@ export default function TradingDashboard() {
     }
   }, [parameters, dataInterval])
 
+  // Auto-run backtest on initial load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleRun30DayBacktest()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, []) // Empty deps = run once on mount only
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Top status bar with integrated controls */}
@@ -298,8 +307,131 @@ export default function TradingDashboard() {
               variant="default"
               className="self-start md:self-auto"
             >
-              {rollingLoading ? 'Running…' : 'Run 30 Day Backtest'}
+              {rollingLoading ? 'Running…' : 'Refresh Backtest'}
             </Button>
+          </div>
+
+          {/* Settings display row */}
+          <div className="flex flex-wrap items-center gap-3 text-base text-muted-foreground bg-black/30 rounded-lg px-4 py-2 border border-border/50">
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm uppercase opacity-60">Token:</span>
+              <Select
+                value={parameters.asset || 'ETH'}
+                onValueChange={(value) => handleParametersChange({ ...parameters, asset: value as 'SOL' | 'ETH' | 'BTC' })}
+              >
+                <SelectTrigger className="font-mono font-semibold text-white w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOL">SOL</SelectItem>
+                  <SelectItem value="ETH">ETH</SelectItem>
+                  <SelectItem value="BTC">BTC</SelectItem>
+                </SelectContent>
+              </Select>
+            </span>
+            <span className="text-border/50">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm uppercase opacity-60">Strategy:</span>
+              <Select
+                value={parameters.strategy || 'momentum'}
+                onValueChange={(value) => handleParametersChange({ ...parameters, strategy: value as 'momentum' | 'contrarian' })}
+              >
+                <SelectTrigger className={`font-semibold w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent ${
+                  parameters.strategy === 'momentum' ? 'text-cyan-400' : 'text-purple-400'
+                }`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="momentum">Momentum</SelectItem>
+                  <SelectItem value="contrarian">Contrarian</SelectItem>
+                </SelectContent>
+              </Select>
+            </span>
+            <span className="text-border/50">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm uppercase opacity-60">Range:</span>
+              <span className="font-mono font-semibold inline-flex items-center">
+                <Select
+                  value={String(parameters.lowThreshold ?? 25)}
+                  onValueChange={(value) => {
+                    const newLow = Number(value)
+                    handleParametersChange({
+                      ...parameters,
+                      lowThreshold: newLow,
+                      highThreshold: Math.max(parameters.highThreshold ?? 75, newLow + 1)
+                    })
+                  }}
+                >
+                  <SelectTrigger className="text-red-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(val => (
+                      <SelectItem key={val} value={String(val)} disabled={val >= (parameters.highThreshold ?? 75)}>
+                        {val}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-muted-foreground mx-1">-</span>
+                <Select
+                  value={String(parameters.highThreshold ?? 75)}
+                  onValueChange={(value) => {
+                    const newHigh = Number(value)
+                    handleParametersChange({
+                      ...parameters,
+                      highThreshold: newHigh,
+                      lowThreshold: Math.min(parameters.lowThreshold ?? 25, newHigh - 1)
+                    })
+                  }}
+                >
+                  <SelectTrigger className="text-green-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[50, 55, 60, 65, 70, 75, 80, 85, 90, 95].map(val => (
+                      <SelectItem key={val} value={String(val)} disabled={val <= (parameters.lowThreshold ?? 25)}>
+                        {val}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </span>
+            </span>
+            <span className="text-border/50">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm uppercase opacity-60">Leverage:</span>
+              <Select
+                value={String(parameters.leverage || 3)}
+                onValueChange={(value) => handleParametersChange({ ...parameters, leverage: Number(value) })}
+              >
+                <SelectTrigger className="font-mono font-semibold text-fuchsia-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(val => (
+                    <SelectItem key={val} value={String(val)}>{val}x</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </span>
+            <span className="text-border/50">•</span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm uppercase opacity-60">Interval:</span>
+              <Select
+                value={dataInterval}
+                onValueChange={(value) => setDataInterval(value as '15min' | '1h' | '4h')}
+              >
+                <SelectTrigger className="font-mono font-semibold text-blue-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15min">15 min</SelectItem>
+                  <SelectItem value="1h">1 hour</SelectItem>
+                  <SelectItem value="4h">4 hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </span>
           </div>
           {rollingError && (
             <div className="text-sm text-destructive">
@@ -323,6 +455,8 @@ export default function TradingDashboard() {
         <BigNumberControls
           parameters={parameters}
           onParametersChange={handleParametersChange}
+          dataInterval={dataInterval}
+          onDataIntervalChange={setDataInterval}
           estimatedPnL={estimatedPnL}
           projectedBalance={projectedBalance}
           backtestResult={backtestResult}
