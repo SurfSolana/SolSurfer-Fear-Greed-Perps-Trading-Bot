@@ -1,280 +1,341 @@
-# Drift FGI Trader v2
+# Lifeguard Trading Core
 
-An automated trading bot for Drift Protocol that executes trades based on Fear & Greed Index (FGI) signals from the 4-hour ETH market.
+Automated cryptocurrency trading bots using Fear & Greed Index (FGI) signals. Supports both **Drift Protocol** (Solana) and **Hyperliquid** (EVM) perpetual futures DEXs.
 
-## Strategy
+## 🚀 Features
 
-The bot implements a momentum-based strategy optimized through backtesting:
-- **SHORT** when FGI d 49 (extreme fear)
-- **LONG** when FGI e 50 (greed)
-- **4x leverage** on all positions
-- Automatically syncs with 4-hour candle boundaries
+- **Multi-Exchange Support**: Trade on Drift Protocol and Hyperliquid
+- **FGI-Based Strategy**: Contrarian trading based on market sentiment
+- **Configurable Risk Management**: Leverage, position sizing, stop losses
+- **PM2 Process Management**: Production-ready deployment
+- **Backtesting Tools**: Historical performance analysis
+- **Real-time Monitoring**: Web dashboard for tracking positions
 
-## Prerequisites
+## 📋 Prerequisites
 
-- Node.js 18+ or Bun runtime
-- Solana wallet with private key
-- USDC collateral on Drift Protocol
-- API access to FGI data endpoint
+- **Node.js 18+** or **Bun** runtime (recommended)
+- Wallet with private key (Solana for Drift, Ethereum for Hyperliquid)
+- Collateral funds (USDC on respective networks)
 
-## Installation
+## 🛠 Installation
 
 ```bash
-# Install dependencies using Bun (recommended)
+# Clone the repository
+git clone https://github.com/yourusername/lifeguard-trading-core.git
+cd lifeguard-trading-core
+
+# Install dependencies with Bun (recommended)
 bun install
 
-# Or using npm
+# Or with npm
 npm install
 ```
 
-## Configuration
+## ⚙️ Configuration
 
-Create a `.env` file in the root directory:
-
+1. **Copy the sample environment file:**
 ```bash
-# Required for live trading
-SOLANA_PRIVATE_KEY=your_base58_private_key_here
-USE_DRIFT_SDK=true  # Set to false for simulation mode
+cp .env.sample .env
+```
 
-# Trading Parameters (optional - defaults shown)
-LEVERAGE=4
-MAX_POSITION_RATIO=0.7  # Use 70% of available collateral
+2. **Edit `.env` with your configuration:**
 
-# Check interval (optional)
+### For Drift Protocol (Solana)
+```env
+# Solana wallet private key (base58 format)
+SOLANA_PRIVATE_KEY=your_private_key_here
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+DRIFT_ENV=mainnet-beta  # or 'devnet' for testing
+```
+
+### For Hyperliquid
+```env
+# Ethereum wallet private key (hex format with 0x prefix)
+HYPERLIQUID_PRIVATE_KEY=0x...
+HYPERLIQUID_TESTNET=true  # Use testnet first!
+HYPERLIQUID_ASSET=ETH
+HYPERLIQUID_LEVERAGE=3
+```
+
+### Trading Parameters (Both Bots)
+```env
+# FGI check interval (ms)
 FGI_CHECK_INTERVAL_MS=300000  # 5 minutes
+
+# Risk management
+LEVERAGE=3
+MAX_POSITION_RATIO=1
+MAX_DAILY_LOSS_PERCENT=50
 ```
 
-## Usage
+## 🎯 Trading Strategy
 
-### Running Commands
+Both bots implement a **contrarian FGI strategy**:
 
-The bot can be run directly with Bun:
+- **LONG** when FGI < 30 (Extreme Fear) - "Buy when others are fearful"
+- **SHORT** when FGI > 70 (Extreme Greed) - "Sell when others are greedy"
+- **HOLD** when FGI is 30-70 (Neutral zone)
+
+The strategy uses the 4-hour timeframe FGI data for ETH.
+
+## 🚦 Quick Start
+
+### Test Connections First
 
 ```bash
-# Test connection and fetch current FGI
-bun run drift-fgi-trader-v2.ts test
+# Test Hyperliquid connection (no private key needed)
+bun run src/test-hyperliquid-public.ts
 
-# Run a single trade check
-bun run drift-fgi-trader-v2.ts once
-
-# Start as a service (continuous monitoring)
-bun run drift-fgi-trader-v2.ts service
-
-# Check current position status
-bun run drift-fgi-trader-v2.ts check-position
-
-# Close all positions
-bun run drift-fgi-trader-v2.ts close
-
-# Force open positions (ignores FGI signal)
-bun run drift-fgi-trader-v2.ts force-long
-bun run drift-fgi-trader-v2.ts force-short
+# Test FGI data feed
+bun run src/test-hyperliquid-fgi.ts
 ```
 
-### Using npm scripts
+### Start Trading Bots
 
-Alternatively, use the provided npm scripts:
+#### Option 1: PM2 (Production)
 
 ```bash
-# Start the trader
-npm run start service
+# Start all bots
+npm run pm2:start
 
-# Force trades
-npm run trade:force-long
-npm run trade:force-short
+# Start specific bot
+npm run bot:hyperliquid:start  # Hyperliquid only
+pm2 start ecosystem.config.js --only drift-fgi-trader  # Drift only
 
-# Close positions
-npm run trade:close
+# Monitor logs
+npm run bot:hyperliquid:logs
+pm2 logs drift-fgi-trader
 
-# Check status
-npm run trade:status
+# Stop bots
+npm run bot:hyperliquid:stop
+pm2 stop all
 ```
 
-## Operating Modes
+#### Option 2: Direct Execution (Development)
 
-### 1. Test Mode
 ```bash
-bun run drift-fgi-trader-v2.ts test
-```
-- Verifies connection to Drift Protocol
-- Fetches current FGI data
-- Does not execute trades
+# Run Hyperliquid bot
+bun run src/bots/hyperliquid-fgi-trader.ts
 
-### 2. Once Mode
-```bash
-bun run drift-fgi-trader-v2.ts once
-```
-- Runs a single trade check
-- Executes trade if conditions are met
-- Exits after completion
-
-### 3. Service Mode
-```bash
-bun run drift-fgi-trader-v2.ts service
-```
-- Runs continuously
-- Syncs with 4-hour candle boundaries
-- Automatically polls for new candles
-- Executes trades when new data arrives
-- Press Ctrl+C to stop gracefully
-
-### 4. Simulation Mode
-Set `USE_DRIFT_SDK=false` in `.env` to run without real trades:
-- Tests logic without risking capital
-- Logs simulated trades
-- Useful for development and testing
-
-## Features
-
-### Automatic 4H Candle Synchronization
-- Calculates next candle update time
-- Waits for candle boundaries
-- Polls API when new data expected
-- Prevents duplicate trades on same candle
-
-### Position Management
-- Automatic position flipping (SHORT to LONG or vice versa)
-- PnL settlement for compounding
-- State persistence across restarts
-
-### Risk Management
-- Position ratio controls
-- Leverage controls
-
-### State Tracking
-- Position state saved to `fgi-drift-state-v2.json`
-- Survives restarts without losing context
-
-## Testing
-
-### Test with Custom FGI Value
-```bash
-bun run drift-fgi-trader-v2.ts test --test-fgi 25  # Test SHORT signal
-bun run drift-fgi-trader-v2.ts test --test-fgi 75  # Test LONG signal
+# Run Drift bot
+bun run drift-fgi-trader-v2.ts
 ```
 
-## Monitoring
+## 🧪 Testing & Safety
 
-The bot provides detailed console output with color-coded messages:
-- =� Green: Successful operations
-- =4 Red: Errors and SHORT signals
-- =5 Blue: Information and waiting periods
-- =� Yellow: Warnings and simulations
-- =� Cyan: Status updates
+### 1. Start with Testnet
 
-## Files Generated
+**Hyperliquid Testnet:**
+1. Set `HYPERLIQUID_TESTNET=true` in `.env`
+2. Get test funds: https://faucet.hyperliquid.xyz/
+3. Test with small positions first
 
-- `fgi-drift-state-v2.json` - Current position state
-- `logs/daily-performance-{date}.json` - Daily trading metrics
-- `.env` - Your configuration (create manually)
+**Drift DevNet:**
+1. Set `DRIFT_ENV=devnet` in `.env`
+2. Get devnet SOL: `solana airdrop 2`
+3. Get devnet USDC: `npm run devnet:fund`
 
-## Safety Features
+### 2. Backtesting
 
-1. **State Persistence**: Remembers position across restarts
-2. **Duplicate Prevention**: Won't process same candle twice
-3. **Graceful Shutdown**: Warns about open positions on exit
-
-## Troubleshooting
-
-### "SOLANA_PRIVATE_KEY environment variable is required"
-Ensure your `.env` file contains a valid Solana private key in base58 format.
-
-### "No collateral available"
-Deposit USDC to your Drift account before trading.
-
-### API Connection Issues
-Check network connectivity and FGI API endpoint availability.
-
-### Position Not Opening
-- Verify sufficient collateral
-- Ensure market is open
-
-## Web UI Dashboard
-
-The project includes a web interface for monitoring trading performance and visualizing backtest results.
-
-### Running the Web UI
+Run historical simulations before live trading:
 
 ```bash
-# Navigate to web directory
-cd web/
-
-# Install dependencies (first time only)
-bun install
-
-# Start development server
-bun dev
-```
-
-The web interface will be available at [http://localhost:3000](http://localhost:3000)
-
-### Current Features
-- **Backtest Visualization**: View historical performance charts and metrics
-- **FGI Time Series**: Monitor Fear & Greed Index movements over time
-- **Strategy Carousel**: Browse and test different trading strategies
-- **Performance Metrics**: Track PnL, win rate, and other key indicators
-
-### ⚠️ Integration Status
-**Note**: The web UI is currently in development. The following features are not yet operational:
-- Start/Stop bot buttons
-- Trading control buttons
-- Live position management
-
-These controls are display-only for now. Full integration with the trading bot is in progress. Currently, the web UI is best used for viewing backtest results and analyzing historical performance.
-
-## PM2 Process Management
-
-The bot can be managed using PM2 for production deployments with hot-reloadable configuration:
-
-### Setup PM2
-```bash
-# Install PM2 globally
-bun add -g pm2
-
-# Start both bot and web UI
-bun run pm2:start
-
-# View logs
-bun run pm2:logs
-
-# Stop all processes
-bun run pm2:stop
-
-# Restart all processes
-bun run pm2:restart
-
-# View status
-bun run pm2:status
-```
-
-### Hot Configuration Reload
-
-The bot reads configuration from `trading-config.json` on each trading cycle, allowing parameter changes without restarts:
-
-1. **From Web UI**: Use the SAVE button after changing parameters
-2. **Manual Edit**: Modify `trading-config.json` directly
-3. **Test Script**: Run `bun run test-hot-config.ts` to verify hot-reload
-
-Configuration includes:
-- `asset`: Trading pair (ETH, SOL, BTC)
-- `leverage`: 1-20x leverage
-- `lowThreshold`: FGI threshold for SHORT (0-100)
-- `highThreshold`: FGI threshold for LONG (0-100)
-- `maxPositionRatio`: Portion of collateral to use (0.1-1.0)
-- `strategy`: "momentum" or "contrarian"
-- `enabled`: true/false to pause trading
-
-## Development
-
-### Running Backtests
-```bash
+# Run backtest with current parameters
 npm run backtest
+
+# Monthly performance analysis
 npm run backtest:monthly
 ```
 
-### Devnet Testing
+### 3. Safety Features
+
+- **Position Limits**: Max position size caps
+- **Liquidation Buffer**: Maintains 15% safety margin
+- **Daily Loss Limits**: Stops trading after 50% daily loss
+- **Manual Override**: Close positions anytime with:
+  ```bash
+  # Force close all Drift positions
+  npm run trade:close
+
+  # Stop all bots immediately
+  pm2 stop all
+  ```
+
+## 📊 Monitoring
+
+### Web Dashboard
+
 ```bash
-npm run devnet:setup
-npm run devnet:fund
-npm run devnet:test
+# Start web dashboard (port 3000)
+cd web && npm run dev
+
+# View at http://localhost:3000
 ```
+
+### PM2 Monitoring
+
+```bash
+# View all processes
+pm2 status
+
+# Real-time logs
+pm2 logs
+
+# Process metrics
+pm2 monit
+```
+
+### Database Logs
+
+All trades are logged to `trading.db` SQLite database:
+
+```bash
+# View recent trades
+sqlite3 trading.db "SELECT * FROM trades ORDER BY timestamp DESC LIMIT 10;"
+```
+
+## 🏗 Project Structure
+
+```
+lifeguard-trading-core/
+├── src/
+│   ├── bots/
+│   │   └── hyperliquid-fgi-trader.ts   # Hyperliquid FGI bot
+│   ├── services/
+│   │   ├── hyperliquid-client.ts       # HL SDK initialization
+│   │   ├── hyperliquid-account.ts      # Account management
+│   │   ├── hyperliquid-trade.ts        # Order execution
+│   │   └── hyperliquid-market.ts       # Market data
+│   └── test-*.ts                       # Test scripts
+├── drift-fgi-trader-v2.ts              # Drift FGI bot
+├── ecosystem.config.js                  # PM2 configuration
+├── web/                                 # Dashboard UI
+├── backtesting/                         # Backtest tools
+├── docs/                               # Documentation
+│   ├── plans/                          # Implementation plans
+│   └── todos/                          # Task lists
+└── .env.sample                         # Configuration template
+```
+
+## 🔧 Advanced Configuration
+
+### Custom FGI Thresholds
+
+Edit the bot files to adjust thresholds:
+
+```typescript
+// src/bots/hyperliquid-fgi-trader.ts
+const CONFIG = {
+    longThreshold: 30,   // Adjust fear threshold
+    shortThreshold: 70,  // Adjust greed threshold
+}
+```
+
+### Multiple Assets
+
+To trade different assets, create separate PM2 processes:
+
+```javascript
+// ecosystem.config.js
+{
+  name: 'hyperliquid-btc-trader',
+  env: {
+    HYPERLIQUID_ASSET: 'BTC',
+    // ... other config
+  }
+}
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **"HYPERLIQUID_PRIVATE_KEY not set"**
+   - Add your private key to `.env` file
+   - Never commit `.env` to git!
+
+2. **"Insufficient balance"**
+   - Add collateral to your wallet
+   - For testnet: use faucets
+   - For mainnet: deposit USDC
+
+3. **"Market is closed"**
+   - Check exchange status
+   - May occur during maintenance
+
+4. **Connection timeouts**
+   - Check network connection
+   - Try alternative RPC endpoints
+   - Increase timeout in client config
+
+### Debug Mode
+
+Enable detailed logging:
+
+```bash
+# Run with debug output
+DEBUG=* bun run src/bots/hyperliquid-fgi-trader.ts
+
+# Check PM2 error logs
+pm2 logs --err
+```
+
+## 🔐 Security
+
+- **NEVER** share or commit private keys
+- Use separate wallets for testing
+- Start with small position sizes
+- Monitor positions regularly
+- Set up alerts for large drawdowns
+
+## 📈 Performance Tracking
+
+Track your trading performance:
+
+```bash
+# View daily P&L
+cat daily-performance.json
+
+# Database analytics
+sqlite3 trading.db "
+  SELECT
+    date(timestamp) as day,
+    count(*) as trades,
+    sum(case when action like '%CLOSE%' then price * size else 0 end) as volume
+  FROM trades
+  GROUP BY day
+  ORDER BY day DESC;
+"
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - see LICENSE file
+
+## ⚠️ Disclaimer
+
+**This software is for educational purposes only.**
+
+- Trading cryptocurrencies involves substantial risk
+- Past performance does not guarantee future results
+- Never trade with funds you cannot afford to lose
+- The authors are not responsible for any financial losses
+
+## 🆘 Support
+
+- **Issues**: Open a GitHub issue
+- **Documentation**: Check `/docs` folder
+- **Hyperliquid Docs**: https://hyperliquid.gitbook.io
+- **Drift Docs**: https://docs.drift.trade
+
+---
+
+Built with ❤️ using TypeScript, Bun, and the power of contrarian trading.

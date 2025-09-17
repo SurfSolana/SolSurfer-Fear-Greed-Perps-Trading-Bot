@@ -58,11 +58,19 @@ type TooltipPayload = ChartPoint & {
   trade?: TradeRecord
 }
 
+type ThresholdLabelPosition =
+  | 'insideLeft'
+  | 'insideRight'
+  | 'insideTopLeft'
+  | 'insideTopRight'
+  | 'insideBottomLeft'
+  | 'insideBottomRight'
+
 type ThresholdLineConfig = {
   value: number
   color: string
   label: string
-  position: 'left' | 'right'
+  position: ThresholdLabelPosition
 }
 
 interface BacktestEquityChartProps {
@@ -297,7 +305,7 @@ export function BacktestEquityChart({ data, summary, loading, trades = [], thres
   }, [thresholds, strategy])
 
   return (
-    <Card className="border-border bg-background/60">
+    <Card className="border-border bg-background/60 overflow-hidden">
       <CardHeader className="space-y-2">
         <CardTitle className="text-base font-semibold">PnL Curve (Starting Capital $10,000)</CardTitle>
         {summary && (
@@ -327,7 +335,7 @@ export function BacktestEquityChart({ data, summary, loading, trades = [], thres
           </div>
         )}
       </CardHeader>
-      <CardContent className="h-80">
+      <CardContent className="h-80 px-0 pb-0 pt-0">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-foreground" />
@@ -338,7 +346,10 @@ export function BacktestEquityChart({ data, summary, loading, trades = [], thres
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 16, right: 24, left: 0, bottom: 0 }}>
+            <ComposedChart
+              data={chartData}
+              margin={{ top: 16, right: 24, left: 16, bottom: 16 }}
+            >
               <defs>
                 <linearGradient id="pnlGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.25} />
@@ -376,7 +387,7 @@ export function BacktestEquityChart({ data, summary, loading, trades = [], thres
                 fontSize={12}
                 axisLine={false}
                 tickLine={false}
-                label={{ value: 'Equity', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11, offset: -5 }}
+                label={{ value: 'Equity', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11, offset: 12 }}
               />
               {thresholdConfig && (
                 <>
@@ -390,7 +401,8 @@ export function BacktestEquityChart({ data, summary, loading, trades = [], thres
                       value: thresholdConfig.fear.label,
                       position: thresholdConfig.fear.position,
                       fill: thresholdConfig.fear.color,
-                      fontSize: 11
+                      fontSize: 11,
+                      offset: 8
                     }}
                   />
                   <ReferenceLine
@@ -403,7 +415,8 @@ export function BacktestEquityChart({ data, summary, loading, trades = [], thres
                       value: thresholdConfig.greed.label,
                       position: thresholdConfig.greed.position,
                       fill: thresholdConfig.greed.color,
-                      fontSize: 11
+                      fontSize: 11,
+                      offset: 8
                     }}
                   />
                 </>

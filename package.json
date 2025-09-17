@@ -23,7 +23,12 @@
     "pm2:logs": "pm2 logs",
     "pm2:status": "pm2 status",
     "pm2:save": "pm2 save",
-    "pm2:startup": "pm2 startup"
+    "pm2:startup": "pm2 startup",
+    "bot:hyperliquid:start": "pm2 start ecosystem.config.js --only hyperliquid-fgi-trader",
+    "bot:hyperliquid:stop": "pm2 stop hyperliquid-fgi-trader",
+    "bot:hyperliquid:restart": "pm2 restart hyperliquid-fgi-trader",
+    "bot:hyperliquid:logs": "pm2 logs hyperliquid-fgi-trader",
+    "bot:hyperliquid:test": "bun run src/services/hyperliquid-client.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.61.0",
@@ -31,6 +36,7 @@
     "@drift-labs/sdk": "^2.136.0",
     "@drift-labs/vaults-sdk": "^0.9.130",
     "@metaplex-foundation/js": "^0.20.1",
+    "@nktkas/hyperliquid": "^0.24.3",
     "@solana-agent-kit/plugin-defi": "^2.0.7",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",

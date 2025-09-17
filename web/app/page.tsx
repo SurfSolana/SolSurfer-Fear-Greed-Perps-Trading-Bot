@@ -269,7 +269,7 @@ export default function TradingDashboard() {
   }, []) // Empty deps = run once on mount only
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen pb-16">
       {/* Top status bar with integrated controls */}
       <CompactStatus
         botStatus={botStatus}
@@ -281,22 +281,22 @@ export default function TradingDashboard() {
         onStart={handleStart}
         onStop={handleStop}
         onSave={handleSave}
-        className="fixed top-0 left-0 right-0 z-50"
+        className="sticky top-0 z-40"
       />
-
-      <main className="pt-16 container mx-auto px-4 py-6 space-y-6">
-        {/* Header action row */}
+      <main className="mx-auto w-full max-w-[1180px] px-6 pb-16 pt-10 space-y-8">
         <div className="flex justify-end">
-          <a href="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+          <a href="/docs" className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground hover:text-white transition-colors">
+            Docs
+          </a>
         </div>
 
-
-        <div className="space-y-4 bg-card border border-border rounded-xl p-6">
+        <div className="panel-shell p-4">
+          <div className="panel-inner rounded-[calc(var(--radius)-6px)] px-6 py-6 space-y-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">30 Day Backtest</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">30 Day Backtest</h2>
               {rollingSummary && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
                   {new Date(rollingSummary.periodStart).toLocaleDateString()} — {new Date(rollingSummary.periodEnd).toLocaleDateString()}
                 </p>
               )}
@@ -311,15 +311,14 @@ export default function TradingDashboard() {
             </Button>
           </div>
 
-          {/* Settings display row */}
-          <div className="flex flex-wrap items-center gap-3 text-base text-muted-foreground bg-black/30 rounded-lg px-4 py-2 border border-border/50">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300 bg-white/5 rounded-xl px-4 py-3 border border-white/10">
             <span className="flex items-center gap-1.5">
-              <span className="text-sm uppercase opacity-60">Token:</span>
+              <span className="text-[0.6rem] uppercase tracking-[0.3em] opacity-60">Token</span>
               <Select
                 value={parameters.asset || 'ETH'}
                 onValueChange={(value) => handleParametersChange({ ...parameters, asset: value as 'SOL' | 'ETH' | 'BTC' })}
               >
-                <SelectTrigger className="font-mono font-semibold text-white w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                <SelectTrigger className="font-mono font-semibold text-white w-fit h-auto rounded-md border border-white/10 bg-transparent px-3 py-1.5 hover:bg-white/5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -329,15 +328,15 @@ export default function TradingDashboard() {
                 </SelectContent>
               </Select>
             </span>
-            <span className="text-border/50">•</span>
+            <span className="text-white/30">•</span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm uppercase opacity-60">Strategy:</span>
+              <span className="text-[0.6rem] uppercase tracking-[0.3em] opacity-60">Strategy</span>
               <Select
                 value={parameters.strategy || 'momentum'}
                 onValueChange={(value) => handleParametersChange({ ...parameters, strategy: value as 'momentum' | 'contrarian' })}
               >
-                <SelectTrigger className={`font-semibold w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent ${
-                  parameters.strategy === 'momentum' ? 'text-cyan-400' : 'text-purple-400'
+                <SelectTrigger className={`font-semibold w-fit h-auto rounded-md border border-white/10 bg-transparent px-3 py-1.5 transition-colors ${
+                  parameters.strategy === 'momentum' ? 'text-[#22d3ee]' : 'text-[#a78bfa]'
                 }`}>
                   <SelectValue />
                 </SelectTrigger>
@@ -347,9 +346,9 @@ export default function TradingDashboard() {
                 </SelectContent>
               </Select>
             </span>
-            <span className="text-border/50">•</span>
+            <span className="text-white/30">•</span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm uppercase opacity-60">Range:</span>
+              <span className="text-[0.6rem] uppercase tracking-[0.3em] opacity-60">Range</span>
               <span className="font-mono font-semibold inline-flex items-center">
                 <Select
                   value={String(parameters.lowThreshold ?? 25)}
@@ -362,7 +361,7 @@ export default function TradingDashboard() {
                     })
                   }}
                 >
-                  <SelectTrigger className="text-red-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                  <SelectTrigger className="w-fit h-auto rounded-md border border-white/10 bg-transparent px-3 py-1.5 font-mono font-semibold text-[#fb7185] hover:bg-white/5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -373,7 +372,7 @@ export default function TradingDashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-                <span className="text-muted-foreground mx-1">-</span>
+                <span className="mx-1 text-white/30">-</span>
                 <Select
                   value={String(parameters.highThreshold ?? 75)}
                   onValueChange={(value) => {
@@ -385,7 +384,7 @@ export default function TradingDashboard() {
                     })
                   }}
                 >
-                  <SelectTrigger className="text-green-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                  <SelectTrigger className="w-fit h-auto rounded-md border border-white/10 bg-transparent px-3 py-1.5 font-mono font-semibold text-[#34d399] hover:bg-white/5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -398,14 +397,14 @@ export default function TradingDashboard() {
                 </Select>
               </span>
             </span>
-            <span className="text-border/50">•</span>
+            <span className="text-white/30">•</span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm uppercase opacity-60">Leverage:</span>
+              <span className="text-[0.6rem] uppercase tracking-[0.3em] opacity-60">Leverage</span>
               <Select
                 value={String(parameters.leverage || 3)}
                 onValueChange={(value) => handleParametersChange({ ...parameters, leverage: Number(value) })}
               >
-                <SelectTrigger className="font-mono font-semibold text-fuchsia-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                <SelectTrigger className="font-mono font-semibold text-[#f472b6] w-fit h-auto rounded-md border border-white/10 bg-transparent px-3 py-1.5 hover:bg-white/5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -415,14 +414,14 @@ export default function TradingDashboard() {
                 </SelectContent>
               </Select>
             </span>
-            <span className="text-border/50">•</span>
+            <span className="text-white/30">•</span>
             <span className="flex items-center gap-1.5">
-              <span className="text-sm uppercase opacity-60">Interval:</span>
+              <span className="text-[0.6rem] uppercase tracking-[0.3em] opacity-60">Interval</span>
               <Select
                 value={dataInterval}
                 onValueChange={(value) => setDataInterval(value as '15min' | '1h' | '4h')}
               >
-                <SelectTrigger className="font-mono font-semibold text-blue-400 w-fit h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:bg-transparent">
+                <SelectTrigger className="font-mono font-semibold text-[#60a5fa] w-fit h-auto rounded-md border border-white/10 bg-transparent px-3 py-1.5 hover:bg-white/5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -434,21 +433,24 @@ export default function TradingDashboard() {
             </span>
           </div>
           {rollingError && (
-            <div className="text-sm text-destructive">
+            <div className="text-sm font-medium text-[#fb7185]">
               {rollingError}
             </div>
           )}
-          <BacktestEquityChart
-            data={rollingCurve}
-            summary={rollingSummary || undefined}
-            loading={rollingLoading}
-            trades={rollingTrades}
-            thresholds={{
-              low: parameters.lowThreshold ?? 25,
-              high: parameters.highThreshold ?? 75
-            }}
-            strategy={(parameters.strategy as 'momentum' | 'contrarian') || 'momentum'}
-          />
+          <div className="surface-tile px-4 py-4">
+            <BacktestEquityChart
+              data={rollingCurve}
+              summary={rollingSummary || undefined}
+              loading={rollingLoading}
+              trades={rollingTrades}
+              thresholds={{
+                low: parameters.lowThreshold ?? 25,
+                high: parameters.highThreshold ?? 75
+              }}
+              strategy={(parameters.strategy as 'momentum' | 'contrarian') || 'momentum'}
+            />
+          </div>
+        </div>
         </div>
 
         {/* Big number controls with carousel inside */}
@@ -462,7 +464,7 @@ export default function TradingDashboard() {
           backtestResult={backtestResult}
         >
           {/* Strategy carousel as child */}
-          <div className="mt-6 mb-6">
+          <div className="mt-8">
             <StrategyCarousel
               onApplyStrategy={handleApplyStrategy}
               currentAsset={parameters.asset}
