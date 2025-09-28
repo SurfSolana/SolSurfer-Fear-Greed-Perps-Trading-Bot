@@ -53,7 +53,7 @@ import {
   IconMoodSmile,
   IconMoodSad,
   IconMoodNeutral,
-  IconMoodCrazy,
+  IconMoodHappy,
   IconChevronRight,
   IconExternalLink
 } from '@tabler/icons-react'
@@ -109,7 +109,7 @@ const getFGIIcon = (value: number) => {
   if (value <= 25) return IconMoodSad
   if (value <= 50) return IconMoodNeutral
   if (value <= 75) return IconMoodSmile
-  return IconMoodCrazy
+  return IconMoodHappy
 }
 
 const getFGIColor = (value: number) => {
