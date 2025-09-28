@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "@mantine/core/styles.css";
+import "@mantine/charts/styles.css";
+import "@mantine/dates/styles.css";
+import "@mantine/notifications/styles.css";
+import "@mantine/spotlight/styles.css";
+import { ColorSchemeScript, MantineProvider, createTheme } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 const geistSans = Geist({
@@ -11,6 +18,27 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const theme = createTheme({
+  primaryColor: "blue",
+  defaultRadius: "md",
+  fontFamily: geistSans.style.fontFamily,
+  fontFamilyMonospace: geistMono.style.fontFamily,
+  colors: {
+    dark: [
+      "#C1C2C5",
+      "#A6A7AB",
+      "#909296",
+      "#5c5f66",
+      "#373A40",
+      "#2C2E33",
+      "#25262b",
+      "#1A1B1E",
+      "#141517",
+      "#101113"
+    ]
+  }
 });
 
 export const metadata: Metadata = {
@@ -35,8 +63,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
+        <ColorSchemeScript defaultColorScheme="dark" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-touch-fullscreen" content="yes" />
@@ -48,9 +77,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <ErrorBoundary level="global">
-          {children}
-        </ErrorBoundary>
+        <MantineProvider theme={theme} defaultColorScheme="dark">
+          <Notifications position="top-right" />
+          <ErrorBoundary level="global">
+            {children}
+          </ErrorBoundary>
+        </MantineProvider>
       </body>
     </html>
   );

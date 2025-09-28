@@ -97,6 +97,13 @@ body {
   color: var(--foreground);
 }
 
+/* Mantine Dark Theme Overrides */
+[data-mantine-color-scheme="dark"] {
+  --mantine-color-body: var(--background);
+  --mantine-color-dark-filled: var(--surface-2);
+  --mantine-color-dark-filled-hover: var(--surface-3);
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -13,6 +13,13 @@
     "warm-cache": "curl -X POST http://localhost:3000/api/backtest/warm-cache"
   },
   "dependencies": {
+    "@mantine/charts": "^8.3.2",
+    "@mantine/core": "^8.3.2",
+    "@mantine/dates": "^8.3.2",
+    "@mantine/form": "^8.3.2",
+    "@mantine/hooks": "^8.3.2",
+    "@mantine/notifications": "^8.3.2",
+    "@mantine/spotlight": "^8.3.2",
     "@number-flow/react": "^0.5.10",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",
