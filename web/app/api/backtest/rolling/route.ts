@@ -11,6 +11,8 @@ interface BacktestRequestBody {
   strategy?: string
   lowThreshold?: number
   highThreshold?: number
+  extremeLowThreshold?: number
+  extremeHighThreshold?: number
   leverage?: number
   timeframe?: string
 }
@@ -96,13 +98,34 @@ function normalizeParams(body: BacktestRequestBody) {
     throw new Error('Thresholds must be within 0-100 and low < high')
   }
 
+  const extremeLowThreshold = Number(body.extremeLowThreshold ?? 0)
+  const extremeHighThreshold = Number(body.extremeHighThreshold ?? 100)
+  if ([extremeLowThreshold, extremeHighThreshold].some(value => !Number.isFinite(value))) {
+    throw new Error('Extreme thresholds must be numbers')
+  }
+  if (
+    extremeLowThreshold < 0 || extremeLowThreshold > 100 ||
+    extremeHighThreshold < 0 || extremeHighThreshold > 100 ||
+    extremeLowThreshold >= extremeHighThreshold
+  ) {
+    throw new Error('Extreme thresholds must be within 0-100 with extremeLow < extremeHigh')
+  }
+  if (extremeLowThreshold > lowThreshold) {
+    throw new Error('Extreme low threshold must be ≤ low threshold')
+  }
+  if (extremeHighThreshold < highThreshold) {
+    throw new Error('Extreme high threshold must be ≥ high threshold')
+  }
+
   return {
     asset: asset as Asset,
     strategy: strategy as Strategy,
     timeframe: timeframe as Timeframe,
     leverage,
     lowThreshold,
-    highThreshold
+    highThreshold,
+    extremeLowThreshold,
+    extremeHighThreshold
   }
 }
 
@@ -189,12 +212,23 @@ function runSimulation(points: HistoricalPoint[], params: ReturnType<typeof norm
   const trades: TradeSummary[] = []
   const equityCurve: EquityPoint[] = []
 
+  const useExtremeLow = params.strategy === 'contrarian' && params.extremeLowThreshold > 0 && params.extremeLowThreshold <= params.lowThreshold
+  const useExtremeHigh = params.strategy === 'contrarian' && params.extremeHighThreshold < 100 && params.extremeHighThreshold >= params.highThreshold
+
   const decideDirection = (fgi: number): 'long' | 'short' | null => {
-    if (params.strategy === 'momentum') {
+    const shouldOverride = params.strategy === 'contrarian' && (
+      (useExtremeLow && fgi <= params.extremeLowThreshold) ||
+      (useExtremeHigh && fgi >= params.extremeHighThreshold)
+    )
+
+    const effectiveStrategy: Strategy = shouldOverride ? 'momentum' : params.strategy
+
+    if (effectiveStrategy === 'momentum') {
       if (fgi >= params.highThreshold) return 'long'
       if (fgi <= params.lowThreshold) return 'short'
       return null
     }
+
     if (fgi <= params.lowThreshold) return 'long'
     if (fgi >= params.highThreshold) return 'short'
     return null

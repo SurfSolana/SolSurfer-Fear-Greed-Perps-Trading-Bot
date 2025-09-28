@@ -51,9 +51,46 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    
+
+    const extremeLow = params.extremeLowThreshold ?? 0
+    const extremeHigh = params.extremeHighThreshold ?? 100
+
+    if (extremeLow < 0 || extremeLow > 100 || extremeHigh < 0 || extremeHigh > 100) {
+      return NextResponse.json(
+        { error: 'Extreme thresholds must be between 0 and 100' },
+        { status: 400 }
+      )
+    }
+
+    if (extremeLow >= extremeHigh) {
+      return NextResponse.json(
+        { error: 'Extreme low threshold must be less than extreme high threshold' },
+        { status: 400 }
+      )
+    }
+
+    if (extremeLow > params.lowThreshold) {
+      return NextResponse.json(
+        { error: 'Extreme low threshold must be ≤ low threshold' },
+        { status: 400 }
+      )
+    }
+
+    if (extremeHigh < params.highThreshold) {
+      return NextResponse.json(
+        { error: 'Extreme high threshold must be ≥ high threshold' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedParams: BacktestParams = {
+      ...params,
+      extremeLowThreshold: extremeLow,
+      extremeHighThreshold: extremeHigh
+    }
+
     // Run backtest with caching
-    const result = await backtestCacheServer.runAndCache(params)
+    const result = await backtestCacheServer.runAndCache(normalizedParams)
     
     return NextResponse.json({
       result,
@@ -93,7 +130,9 @@ export async function GET(request: NextRequest) {
             leverage,
             lowThreshold: low,
             highThreshold: high,
-            strategy: strategy as 'contrarian' | 'momentum'
+            strategy: strategy as 'contrarian' | 'momentum',
+            extremeLowThreshold: 0,
+            extremeHighThreshold: 100
           })
           
           estimates.push({

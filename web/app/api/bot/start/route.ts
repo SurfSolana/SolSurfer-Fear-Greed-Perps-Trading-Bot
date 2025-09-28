@@ -39,13 +39,15 @@ export async function POST(request: NextRequest) {
       asset = 'ETH',
       lowThreshold = 25,
       highThreshold = 75,
+      extremeLowThreshold = 0,
+      extremeHighThreshold = 100,
       leverage = 4,
       strategy = 'momentum',
       timeframe = '4h',
       maxPositionRatio = 1.0
     } = body
 
-    requestContext.params = { asset, lowThreshold, highThreshold, leverage, strategy, timeframe, maxPositionRatio }
+    requestContext.params = { asset, lowThreshold, highThreshold, extremeLowThreshold, extremeHighThreshold, leverage, strategy, timeframe, maxPositionRatio }
 
     // Validate input parameters
     if (leverage < 1 || leverage > 10) {
@@ -60,6 +62,18 @@ export async function POST(request: NextRequest) {
       throw new Error('Low threshold must be less than high threshold')
     }
 
+    if (extremeLowThreshold < 0 || extremeLowThreshold > 100 || extremeHighThreshold < 0 || extremeHighThreshold > 100) {
+      throw new Error('Extreme thresholds must be between 0 and 100')
+    }
+
+    if (extremeLowThreshold > lowThreshold) {
+      throw new Error('Extreme low threshold must be less than or equal to low threshold')
+    }
+
+    if (extremeHighThreshold < highThreshold) {
+      throw new Error('Extreme high threshold must be greater than or equal to high threshold')
+    }
+
     // Write complete configuration to shared JSON file for hot-reload
     const configPath = path.join(process.cwd(), '..', 'data', 'trading-config.json')
     const config = {
@@ -67,6 +81,8 @@ export async function POST(request: NextRequest) {
       leverage,
       lowThreshold,
       highThreshold,
+      extremeLowThreshold,
+      extremeHighThreshold,
       strategy,
       enabled: true,
       timeframe,

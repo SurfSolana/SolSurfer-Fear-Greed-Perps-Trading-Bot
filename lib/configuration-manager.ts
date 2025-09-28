@@ -84,10 +84,12 @@ export class ConfigurationManager {
     return this.config.leverage;
   }
 
-  getThresholds(): { low: number; high: number } {
+  getThresholds(): { low: number; high: number; extremeLow: number; extremeHigh: number } {
     return {
       low: this.config.lowThreshold,
-      high: this.config.highThreshold
+      high: this.config.highThreshold,
+      extremeLow: this.config.extremeLowThreshold,
+      extremeHigh: this.config.extremeHighThreshold
     };
   }
 

@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import Decimal from 'decimal.js';
+import cliProgress from 'cli-progress';
 import { Database } from 'bun:sqlite';
 
 // Configure Decimal.js for financial precision
@@ -25,6 +26,7 @@ const CONFIG = {
   // Asset and timeframe
   ASSET: namedArgs.asset || 'ETH',
   TIMEFRAME: namedArgs.timeframe || '1h', // 1 hour intervals
+  STRATEGY: (namedArgs.strategy as 'momentum' | 'contrarian') || 'momentum',
   
   // Rolling window
   ROLLING_DAYS: 30, // 30-day rolling window for FGI calculations
@@ -45,6 +47,18 @@ const CONFIG = {
     start: parseInt(namedArgs['long-start'] || '50'),
     end: parseInt(namedArgs['long-end'] || '80'),
     step: parseInt(namedArgs['long-step'] || '5')
+  },
+
+  FGI_EXTREME_LOW_RANGE: {
+    start: parseInt(namedArgs['extreme-low-start'] ?? namedArgs['extreme-low'] ?? '0'),
+    end: parseInt(namedArgs['extreme-low-end'] ?? namedArgs['extreme-low'] ?? '0'),
+    step: parseInt(namedArgs['extreme-low-step'] || '5')
+  },
+
+  FGI_EXTREME_HIGH_RANGE: {
+    start: parseInt(namedArgs['extreme-high-start'] ?? namedArgs['extreme-high'] ?? '100'),
+    end: parseInt(namedArgs['extreme-high-end'] ?? namedArgs['extreme-high'] ?? '100'),
+    step: parseInt(namedArgs['extreme-high-step'] || '5')
   },
   
   // Financial settings
@@ -79,14 +93,12 @@ interface PriceData {
 interface FGIData {
   timestamp: string;
   fgi: number;
-  rollingAvg30d?: number;
 }
 
 interface CombinedData {
   timestamp: string;
   price: number;
   fgi: number;
-  fgi30d: number; // 30-day rolling average
   volume?: number;
 }
 
@@ -98,6 +110,7 @@ interface Position {
   entryTime: string;
   unrealizedPnL: Decimal;
   fundingPaid: Decimal;
+  strategyMode: 'momentum' | 'contrarian';
 }
 
 interface BacktestResult {
@@ -105,6 +118,10 @@ interface BacktestResult {
   leverage: number;
   shortThreshold: number;
   longThreshold: number;
+  extremeLowThreshold: number;
+  extremeHighThreshold: number;
+  strategy: 'momentum' | 'contrarian';
+  momentumOverrideActivations: number;
   
   // Performance metrics
   totalReturn: number;
@@ -137,16 +154,37 @@ interface BacktestResult {
   trades?: TradeLog[];
 }
 
+interface WindowedBacktestResult extends BacktestResult {
+  windowIndex: number;
+  windowStart: string;
+  windowEnd: string;
+  sampleCount: number;
+}
+
+interface RollingRunMeta {
+  runId: string;
+  timestamp: string;
+  asset: string;
+  timeframe: string;
+  strategy: 'momentum' | 'contrarian';
+  windowSizeDays: number;
+}
+
+interface RollingResultsWriter {
+  insert(records: WindowedBacktestResult[]): void;
+  close(): void;
+}
+
 interface TradeLog {
   timestamp: string;
   action: 'OPEN_LONG' | 'OPEN_SHORT' | 'CLOSE';
   price: number;
   fgi: number;
-  fgi30d: number;
   size: number;
   pnl?: number;
   fees: number;
   balance: number;
+  strategyMode?: 'momentum' | 'contrarian';
 }
 
 // Fetch historical price data
@@ -211,29 +249,6 @@ async function fetchFGIData(): Promise<FGIData[]> {
   }
 }
 
-// Calculate 30-day rolling FGI average
-function calculate30DayRollingFGI(fgiData: FGIData[]): FGIData[] {
-  const result: FGIData[] = [];
-  const windowHours = CONFIG.ROLLING_DAYS * 24; // Convert days to hours for 1h timeframe
-  
-  for (let i = 0; i < fgiData.length; i++) {
-    // Calculate the start index for the 30-day window
-    const startIdx = Math.max(0, i - windowHours + 1);
-    
-    // Calculate rolling average
-    const windowData = fgiData.slice(startIdx, i + 1);
-    const sum = windowData.reduce((acc, d) => acc + d.fgi, 0);
-    const avg = sum / windowData.length;
-    
-    result.push({
-      ...fgiData[i],
-      rollingAvg30d: avg
-    });
-  }
-  
-  return result;
-}
-
 // Combine price and FGI data
 function combineData(priceData: PriceData[], fgiData: FGIData[]): CombinedData[] {
   const fgiMap = new Map(fgiData.map(d => [d.timestamp, d]));
@@ -246,7 +261,6 @@ function combineData(priceData: PriceData[], fgiData: FGIData[]): CombinedData[]
         timestamp: pricePoint.timestamp,
         price: pricePoint.price,
         fgi: fgiPoint.fgi,
-        fgi30d: fgiPoint.rollingAvg30d || fgiPoint.fgi,
         volume: pricePoint.volume
       });
     }
@@ -255,34 +269,106 @@ function combineData(priceData: PriceData[], fgiData: FGIData[]): CombinedData[]
   return combined;
 }
 
+function generateRollingWindows(data: CombinedData[], windowDays: number): Array<{
+  index: number;
+  start: string;
+  end: string;
+  data: CombinedData[];
+}> {
+  if (data.length === 0) {
+    return [];
+  }
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const timestamps = data.map(d => new Date(d.timestamp).getTime());
+  const firstTimestamp = timestamps[0];
+  const lastTimestamp = timestamps[timestamps.length - 1];
+  const totalSpanDays = Math.floor((lastTimestamp - firstTimestamp) / dayMs) + 1;
+  const totalWindows = Math.max(0, totalSpanDays - windowDays + 1);
+
+  const windows: Array<{ index: number; start: string; end: string; data: CombinedData[] }> = [];
+  if (totalWindows === 0) {
+    return windows;
+  }
+
+  let startIdx = 0;
+  let endIdx = 0;
+
+  for (let w = 0; w < totalWindows; w++) {
+    const windowStartMs = firstTimestamp + w * dayMs;
+    const windowEndMs = windowStartMs + windowDays * dayMs;
+
+    while (startIdx < data.length && timestamps[startIdx] < windowStartMs) {
+      startIdx++;
+    }
+    if (startIdx >= data.length) {
+      break;
+    }
+
+    if (endIdx < startIdx) {
+      endIdx = startIdx;
+    }
+
+    while (endIdx < data.length && timestamps[endIdx] < windowEndMs) {
+      endIdx++;
+    }
+
+    const slice = data.slice(startIdx, endIdx);
+    if (slice.length < 2) {
+      continue;
+    }
+
+    windows.push({
+      index: w,
+      start: slice[0].timestamp,
+      end: slice[slice.length - 1].timestamp,
+      data: slice
+    });
+  }
+
+  return windows;
+}
+
 // Run backtest for a specific configuration
 function runBacktest(
   data: CombinedData[],
   leverage: number,
   shortThreshold: number,
-  longThreshold: number
+  longThreshold: number,
+  extremeLowThreshold: number,
+  extremeHighThreshold: number,
+  baseStrategy: 'momentum' | 'contrarian'
 ): BacktestResult {
   // Initialize state
   let balance = new Decimal(CONFIG.INITIAL_CAPITAL);
   let position: Position | null = null;
   const trades: TradeLog[] = [];
-  
+
   // Metrics tracking
   let numTrades = 0;
   let winningTrades = 0;
   let totalFees = new Decimal(0);
   let totalFunding = new Decimal(0);
   let liquidations = 0;
-  
+
   let timeInLong = 0;
   let timeInShort = 0;
   let timeInNeutral = 0;
-  
+
   let peakBalance = balance;
   let maxDrawdown = 0;
-  
+
   const returns: number[] = [];
-  
+  let overrideActive = false;
+  let overrideActivations = 0;
+
+  const useExtremeLow = baseStrategy === 'contrarian'
+    && extremeLowThreshold > 0
+    && extremeLowThreshold <= shortThreshold;
+  const useExtremeHigh = baseStrategy === 'contrarian'
+    && extremeHighThreshold < 100
+    && extremeHighThreshold >= longThreshold;
+
   // Process each data point
   for (let i = 0; i < data.length; i++) {
     const point = data[i];
@@ -324,21 +410,21 @@ function runBacktest(
         liquidations++;
         const loss = position.size.mul(0.95); // Lose 95% on liquidation
         balance = balance.minus(loss);
-        
+
         if (CONFIG.DETAILED_LOGS) {
           trades.push({
             timestamp: point.timestamp,
             action: 'CLOSE',
             price: point.price,
             fgi: point.fgi,
-            fgi30d: point.fgi30d,
             size: position.size.toNumber(),
             pnl: loss.neg().toNumber(),
             fees: 0,
-            balance: balance.toNumber()
+            balance: balance.toNumber(),
+            strategyMode: position.strategyMode
           });
         }
-        
+
         position = null;
         
         // Check if account is blown
@@ -350,15 +436,35 @@ function runBacktest(
       timeInNeutral++;
     }
     
-    // Determine target position based on 30-day rolling FGI
-    let targetPosition: 'LONG' | 'SHORT' | 'NEUTRAL' = 'NEUTRAL';
-    
-    if (point.fgi30d <= shortThreshold) {
-      targetPosition = 'SHORT';
-    } else if (point.fgi30d >= longThreshold) {
-      targetPosition = 'LONG';
+    const shouldOverride = baseStrategy === 'contrarian' && (
+      (useExtremeLow && point.fgi <= extremeLowThreshold) ||
+      (useExtremeHigh && point.fgi >= extremeHighThreshold)
+    );
+
+    if (shouldOverride && !overrideActive) {
+      overrideActivations++;
     }
-    
+
+    overrideActive = shouldOverride;
+    const effectiveStrategy: 'momentum' | 'contrarian' = shouldOverride ? 'momentum' : baseStrategy;
+
+    // Determine target position based on the FGI reading and effective strategy mode
+    let targetPosition: 'LONG' | 'SHORT' | 'NEUTRAL' = 'NEUTRAL';
+
+    if (effectiveStrategy === 'momentum') {
+      if (point.fgi <= shortThreshold) {
+        targetPosition = 'SHORT';
+      } else if (point.fgi >= longThreshold) {
+        targetPosition = 'LONG';
+      }
+    } else {
+      if (point.fgi <= shortThreshold) {
+        targetPosition = 'LONG';
+      } else if (point.fgi >= longThreshold) {
+        targetPosition = 'SHORT';
+      }
+    }
+
     // Execute position changes
     if (position && position.type !== targetPosition) {
       // Close existing position
@@ -370,6 +476,7 @@ function runBacktest(
       
       if (totalPnL.gt(0)) winningTrades++;
       returns.push(totalPnL.div(position.size).toNumber());
+      const closingStrategyMode = position.strategyMode;
       
       if (CONFIG.DETAILED_LOGS) {
         trades.push({
@@ -377,11 +484,11 @@ function runBacktest(
           action: 'CLOSE',
           price: point.price,
           fgi: point.fgi,
-          fgi30d: point.fgi30d,
           size: position.size.toNumber(),
           pnl: totalPnL.toNumber(),
           fees: closeFee.toNumber(),
-          balance: balance.toNumber()
+          balance: balance.toNumber(),
+          strategyMode: closingStrategyMode
         });
       }
       
@@ -402,19 +509,20 @@ function runBacktest(
         leverage: leverage,
         entryTime: point.timestamp,
         unrealizedPnL: new Decimal(0),
-        fundingPaid: new Decimal(0)
+        fundingPaid: new Decimal(0),
+        strategyMode: effectiveStrategy
       };
-      
+
       if (CONFIG.DETAILED_LOGS) {
         trades.push({
           timestamp: point.timestamp,
           action: targetPosition === 'LONG' ? 'OPEN_LONG' : 'OPEN_SHORT',
           price: point.price,
           fgi: point.fgi,
-          fgi30d: point.fgi30d,
           size: position.size.toNumber(),
           fees: openFee.toNumber(),
-          balance: balance.toNumber()
+          balance: balance.toNumber(),
+          strategyMode: effectiveStrategy
         });
       }
       
@@ -462,6 +570,10 @@ function runBacktest(
     leverage,
     shortThreshold,
     longThreshold,
+    extremeLowThreshold,
+    extremeHighThreshold,
+    strategy: baseStrategy,
+    momentumOverrideActivations: overrideActivations,
     totalReturn,
     totalReturnPercent,
     sharpeRatio,
@@ -484,25 +596,190 @@ function runBacktest(
 }
 
 // Generate parameter combinations
-function generateParameterCombinations(): Array<{leverage: number, short: number, long: number}> {
-  const combinations: Array<{leverage: number, short: number, long: number}> = [];
-  
+function expandRange(range: { start: number; end: number; step: number }, clampMin = 0, clampMax = 100): number[] {
+  const min = Math.max(Math.min(range.start, range.end), clampMin);
+  const max = Math.min(Math.max(range.start, range.end), clampMax);
+  const step = Math.max(Math.abs(range.step) || 1, 1);
+
+  const values = new Set<number>();
+  if (min === max) {
+    values.add(Math.round(min));
+  } else {
+    for (let value = min; value <= max; value += step) {
+      values.add(Math.round(value));
+    }
+    values.add(Math.round(max));
+  }
+
+  return Array.from(values).sort((a, b) => a - b);
+}
+
+function generateParameterCombinations(): Array<{
+  leverage: number;
+  short: number;
+  long: number;
+  extremeLow: number;
+  extremeHigh: number;
+}> {
+  const combinations: Array<{ leverage: number; short: number; long: number; extremeLow: number; extremeHigh: number }> = [];
+
+  const shortValues = expandRange(CONFIG.FGI_SHORT_RANGE);
+  const longValues = expandRange(CONFIG.FGI_LONG_RANGE);
+  const extremeLowValues = expandRange(CONFIG.FGI_EXTREME_LOW_RANGE);
+  const extremeHighValues = expandRange(CONFIG.FGI_EXTREME_HIGH_RANGE);
+
   for (const leverage of CONFIG.LEVERAGE_LEVELS) {
-    for (let short = CONFIG.FGI_SHORT_RANGE.start; 
-         short <= CONFIG.FGI_SHORT_RANGE.end; 
-         short += CONFIG.FGI_SHORT_RANGE.step) {
-      for (let long = CONFIG.FGI_LONG_RANGE.start; 
-           long <= CONFIG.FGI_LONG_RANGE.end; 
-           long += CONFIG.FGI_LONG_RANGE.step) {
-        // Only valid if short < long (proper neutral zone)
-        if (short < long) {
-          combinations.push({ leverage, short, long });
+    for (const short of shortValues) {
+      for (const long of longValues) {
+        if (short >= long) continue;
+
+        for (const extremeLow of extremeLowValues) {
+          if (extremeLow > short) continue;
+          for (const extremeHigh of extremeHighValues) {
+            if (extremeHigh < long) continue;
+
+            combinations.push({
+              leverage,
+              short,
+              long,
+              extremeLow,
+              extremeHigh
+            });
+          }
         }
       }
     }
   }
-  
+
   return combinations;
+}
+
+function ensureDirectoryExists(dir: string) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function createRollingResultsWriter(dbPath: string, meta: RollingRunMeta): RollingResultsWriter {
+  ensureDirectoryExists(path.dirname(dbPath));
+
+  const db = new Database(dbPath);
+  db.exec('PRAGMA busy_timeout = 5000');
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS rolling_backtests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id TEXT NOT NULL,
+      run_timestamp TEXT NOT NULL,
+      asset TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      strategy TEXT NOT NULL,
+      window_index INTEGER NOT NULL,
+      window_start TEXT NOT NULL,
+      window_end TEXT NOT NULL,
+      window_size_days INTEGER NOT NULL,
+      sample_count INTEGER NOT NULL,
+      leverage REAL NOT NULL,
+      short_threshold INTEGER NOT NULL,
+      long_threshold INTEGER NOT NULL,
+      extreme_low_threshold INTEGER,
+      extreme_high_threshold INTEGER,
+      override_count INTEGER,
+      total_return REAL NOT NULL,
+      total_return_percent REAL NOT NULL,
+      sharpe_ratio REAL NOT NULL,
+      max_drawdown REAL NOT NULL,
+      num_trades INTEGER NOT NULL,
+      win_rate REAL NOT NULL,
+      liquidations INTEGER NOT NULL,
+      time_in_market REAL NOT NULL,
+      avg_trade_return REAL,
+      best_trade REAL,
+      worst_trade REAL,
+      volatility REAL,
+      total_fees REAL,
+      total_funding REAL,
+      time_in_long REAL,
+      time_in_short REAL,
+      time_in_neutral REAL
+    )
+  `);
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rolling_run ON rolling_backtests (run_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rolling_window ON rolling_backtests (asset, timeframe, strategy, window_index)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rolling_params ON rolling_backtests (short_threshold, long_threshold, leverage)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rolling_returns ON rolling_backtests (total_return_percent DESC)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_rolling_sharpe ON rolling_backtests (sharpe_ratio DESC)`);
+
+  const insertStmt = db.prepare(`
+    INSERT INTO rolling_backtests (
+      run_id, run_timestamp, asset, timeframe, strategy,
+      window_index, window_start, window_end, window_size_days, sample_count,
+      leverage, short_threshold, long_threshold, extreme_low_threshold, extreme_high_threshold, override_count,
+      total_return, total_return_percent, sharpe_ratio, max_drawdown,
+      num_trades, win_rate, liquidations, time_in_market,
+      avg_trade_return, best_trade, worst_trade, volatility,
+      total_fees, total_funding, time_in_long, time_in_short, time_in_neutral
+    ) VALUES (
+      $run_id, $run_timestamp, $asset, $timeframe, $strategy,
+      $window_index, $window_start, $window_end, $window_size_days, $sample_count,
+      $leverage, $short_threshold, $long_threshold, $extreme_low_threshold, $extreme_high_threshold, $override_count,
+      $total_return, $total_return_percent, $sharpe_ratio, $max_drawdown,
+      $num_trades, $win_rate, $liquidations, $time_in_market,
+      $avg_trade_return, $best_trade, $worst_trade, $volatility,
+      $total_fees, $total_funding, $time_in_long, $time_in_short, $time_in_neutral
+    )
+  `);
+
+  const insertBatch = db.transaction((records: WindowedBacktestResult[]) => {
+    for (const record of records) {
+      insertStmt.run({
+        $run_id: meta.runId,
+        $run_timestamp: meta.timestamp,
+        $asset: meta.asset,
+        $timeframe: meta.timeframe,
+        $strategy: record.strategy,
+        $window_index: record.windowIndex,
+        $window_start: record.windowStart,
+        $window_end: record.windowEnd,
+        $window_size_days: meta.windowSizeDays,
+        $sample_count: record.sampleCount,
+        $leverage: record.leverage,
+        $short_threshold: record.shortThreshold,
+        $long_threshold: record.longThreshold,
+        $extreme_low_threshold: record.extremeLowThreshold,
+        $extreme_high_threshold: record.extremeHighThreshold,
+        $override_count: record.momentumOverrideActivations,
+        $total_return: record.totalReturn,
+        $total_return_percent: record.totalReturnPercent,
+        $sharpe_ratio: record.sharpeRatio,
+        $max_drawdown: record.maxDrawdown,
+        $num_trades: record.numTrades,
+        $win_rate: record.winRate,
+        $liquidations: record.liquidations,
+        $time_in_market: record.timeInMarket,
+        $avg_trade_return: record.avgTradeReturn,
+        $best_trade: record.bestTrade,
+        $worst_trade: record.worstTrade,
+        $volatility: record.volatility,
+        $total_fees: record.totalFeesPaid,
+        $total_funding: record.totalFundingPaid,
+        $time_in_long: record.timeInLong,
+        $time_in_short: record.timeInShort,
+        $time_in_neutral: record.timeInNeutral
+      });
+    }
+  });
+
+  return {
+    insert(records: WindowedBacktestResult[]) {
+      if (!records.length) return;
+      insertBatch(records);
+    },
+    close() {
+      db.close();
+    }
+  };
 }
 
 // Main execution
@@ -512,231 +789,193 @@ async function main() {
 ║     FGI Leverage Backtest with 30-Day Rolling Window         ║
 ╚══════════════════════════════════════════════════════════════╝
   `));
-  
+
   console.log(chalk.yellow('Configuration:'));
   console.log(`  Asset: ${CONFIG.ASSET}`);
   console.log(`  Timeframe: ${CONFIG.TIMEFRAME}`);
+  console.log(`  Base Strategy: ${CONFIG.STRATEGY}`);
   console.log(`  Rolling Window: ${CONFIG.ROLLING_DAYS} days`);
   console.log(`  Leverage Levels: ${CONFIG.LEVERAGE_LEVELS.join('x, ')}x`);
   console.log(`  FGI Short Range: ${CONFIG.FGI_SHORT_RANGE.start}-${CONFIG.FGI_SHORT_RANGE.end}`);
   console.log(`  FGI Long Range: ${CONFIG.FGI_LONG_RANGE.start}-${CONFIG.FGI_LONG_RANGE.end}`);
+  console.log(`  Extreme Low Range: ${CONFIG.FGI_EXTREME_LOW_RANGE.start}-${CONFIG.FGI_EXTREME_LOW_RANGE.end}`);
+  console.log(`  Extreme High Range: ${CONFIG.FGI_EXTREME_HIGH_RANGE.start}-${CONFIG.FGI_EXTREME_HIGH_RANGE.end}`);
   console.log(`  Initial Capital: $${CONFIG.INITIAL_CAPITAL.toLocaleString()}`);
   console.log(`  Test Period: ${CONFIG.DAYS_TO_TEST} days\n`);
-  
-  // Fetch data
+
+  if (!['momentum', 'contrarian'].includes(CONFIG.STRATEGY)) {
+    throw new Error(`Unsupported strategy: ${CONFIG.STRATEGY}`);
+  }
+
   console.log(chalk.cyan('Fetching market data...'));
   const [priceData, fgiData] = await Promise.all([
     fetchPriceData(),
     fetchFGIData()
   ]);
-  
-  // Calculate rolling FGI
-  console.log(chalk.cyan('Calculating 30-day rolling FGI...'));
-  const fgiWithRolling = calculate30DayRollingFGI(fgiData);
-  
-  // Combine data
-  const combinedData = combineData(priceData, fgiWithRolling);
-  console.log(chalk.green(`✓ Prepared ${combinedData.length} data points for backtesting\n`));
-  
-  // Generate parameter combinations
+
+  const combinedData = combineData(priceData, fgiData);
+  console.log(chalk.green(`✓ Prepared ${combinedData.length} merged data points`));
+
+  if (combinedData.length < 2) {
+    console.log(chalk.red('Not enough combined data to run backtests.'));
+    return;
+  }
+
+  console.log(chalk.cyan('Building rolling windows...'));
+  const windows = generateRollingWindows(combinedData, CONFIG.ROLLING_DAYS);
+  const expectedWindows = Math.max(0, CONFIG.DAYS_TO_TEST - CONFIG.ROLLING_DAYS + 1);
+  console.log(chalk.green(`✓ Constructed ${windows.length} windows (expected ≈ ${expectedWindows})\n`));
+
+  if (!windows.length) {
+    console.log(chalk.red('No rolling windows available. Verify data coverage or adjust configuration.'));
+    return;
+  }
+
   const combinations = generateParameterCombinations();
-  console.log(chalk.yellow(`Testing ${combinations.length} parameter combinations...\n`));
-  
-  // Run backtests
-  const results: BacktestResult[] = [];
-  const startTime = Date.now();
-  
-  for (let i = 0; i < combinations.length; i++) {
-    const combo = combinations[i];
-    
-    // Progress indicator
-    if (i % 10 === 0) {
-      const progress = ((i / combinations.length) * 100).toFixed(1);
-      process.stdout.write(`\rProgress: ${progress}% (${i}/${combinations.length})`);
-    }
-    
-    const result = runBacktest(
-      combinedData,
-      combo.leverage,
-      combo.short,
-      combo.long
-    );
-    
-    results.push(result);
-  }
-  
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(chalk.green(`\n✓ Completed ${combinations.length} backtests in ${elapsed}s\n`));
-  
-  // Sort results by total return
-  results.sort((a, b) => b.totalReturnPercent - a.totalReturnPercent);
-  
-  // Display top results
-  console.log(chalk.cyan.bold('Top 10 Configurations by Total Return:\n'));
-  
-  const top10 = results.slice(0, 10);
-  console.log(chalk.white('Rank | Leverage | Short≤ | Long≥ | Return% | Sharpe | MaxDD% | Trades | WinRate | Liquid.'));
-  console.log(chalk.white('-----|----------|--------|-------|---------|--------|--------|--------|---------|--------'));
-  
-  top10.forEach((result, idx) => {
-    const color = result.liquidations > 0 ? chalk.red : 
-                   result.totalReturnPercent > 100 ? chalk.green :
-                   result.totalReturnPercent > 0 ? chalk.yellow : chalk.red;
-    
-    console.log(color(
-      `${String(idx + 1).padStart(4)} | ` +
-      `${String(result.leverage + 'x').padStart(8)} | ` +
-      `${String(result.shortThreshold).padStart(6)} | ` +
-      `${String(result.longThreshold).padStart(5)} | ` +
-      `${result.totalReturnPercent.toFixed(1).padStart(7)} | ` +
-      `${result.sharpeRatio.toFixed(2).padStart(6)} | ` +
-      `${result.maxDrawdown.toFixed(1).padStart(6)} | ` +
-      `${String(result.numTrades).padStart(6)} | ` +
-      `${result.winRate.toFixed(1).padStart(7)} | ` +
-      `${String(result.liquidations).padStart(7)}`
-    ));
-  });
-  
-  // Best risk-adjusted return (Sharpe ratio)
-  const bestSharpe = results.reduce((best, current) => 
-    current.sharpeRatio > best.sharpeRatio ? current : best
-  );
-  
-  // Best conservative (no liquidations, lowest drawdown)
-  const conservative = results
-    .filter(r => r.liquidations === 0)
-    .sort((a, b) => a.maxDrawdown - b.maxDrawdown)[0];
-  
-  console.log(chalk.cyan.bold('\n📊 Optimization Summary:\n'));
-  
-  console.log(chalk.green('Best Overall Return:'));
-  console.log(`  Configuration: ${top10[0].leverage}x leverage, Short ≤ ${top10[0].shortThreshold}, Long ≥ ${top10[0].longThreshold}`);
-  console.log(`  Total Return: ${top10[0].totalReturnPercent.toFixed(2)}%`);
-  console.log(`  Sharpe Ratio: ${top10[0].sharpeRatio.toFixed(2)}`);
-  console.log(`  Max Drawdown: ${top10[0].maxDrawdown.toFixed(2)}%`);
-  console.log(`  Liquidations: ${top10[0].liquidations}`);
-  
-  console.log(chalk.yellow('\nBest Risk-Adjusted (Sharpe):'));
-  console.log(`  Configuration: ${bestSharpe.leverage}x leverage, Short ≤ ${bestSharpe.shortThreshold}, Long ≥ ${bestSharpe.longThreshold}`);
-  console.log(`  Total Return: ${bestSharpe.totalReturnPercent.toFixed(2)}%`);
-  console.log(`  Sharpe Ratio: ${bestSharpe.sharpeRatio.toFixed(2)}`);
-  console.log(`  Max Drawdown: ${bestSharpe.maxDrawdown.toFixed(2)}%`);
-  
-  if (conservative) {
-    console.log(chalk.blue('\nMost Conservative (No Liquidations):'));
-    console.log(`  Configuration: ${conservative.leverage}x leverage, Short ≤ ${conservative.shortThreshold}, Long ≥ ${conservative.longThreshold}`);
-    console.log(`  Total Return: ${conservative.totalReturnPercent.toFixed(2)}%`);
-    console.log(`  Sharpe Ratio: ${conservative.sharpeRatio.toFixed(2)}`);
-    console.log(`  Max Drawdown: ${conservative.maxDrawdown.toFixed(2)}%`);
-  }
-  
-  // Save results to SQLite database
-  if (!fs.existsSync(CONFIG.OUTPUT_DIR)) {
-    fs.mkdirSync(CONFIG.OUTPUT_DIR, { recursive: true });
+  console.log(chalk.yellow(`Running ${combinations.length} parameter combinations per window...\n`));
+
+  if (!combinations.length) {
+    console.log(chalk.red('No parameter combinations generated. Adjust FGI ranges or leverage levels.'));
+    return;
   }
 
-  // Create a run ID based on timestamp for tracking
   const runId = new Date().toISOString().replace(/[:.]/g, '-');
-  const timestamp = new Date().toISOString();
+  const runTimestamp = new Date().toISOString();
 
-  // Open SQLite database (consolidated)
-  const dbPath = path.join(__dirname, 'backtest-results', 'all-backtests.db');
-  const db = new Database(dbPath);
+  const outputDir = path.resolve(CONFIG.OUTPUT_DIR);
+  ensureDirectoryExists(outputDir);
+  const dbPath = path.join(outputDir, 'rolling-backtests.db');
 
-  // Create table if it doesn't exist
-  db.run(`
-    CREATE TABLE IF NOT EXISTS backtests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      run_id TEXT NOT NULL,
-      timestamp TEXT NOT NULL,
-      asset TEXT NOT NULL,
-      timeframe TEXT NOT NULL,
-      strategy TEXT DEFAULT 'momentum',
-      short_threshold INTEGER NOT NULL,
-      long_threshold INTEGER NOT NULL,
-      leverage INTEGER NOT NULL,
-      total_return REAL NOT NULL,
-      sharpe_ratio REAL NOT NULL,
-      max_drawdown REAL NOT NULL,
-      num_trades INTEGER NOT NULL,
-      win_rate REAL NOT NULL,
-      liquidations INTEGER NOT NULL,
-      time_in_market REAL NOT NULL,
-      fees REAL NOT NULL,
-      funding REAL NOT NULL
-    )
-  `);
-
-  // Create indexes for fast lookups
-  db.run(`CREATE INDEX IF NOT EXISTS idx_asset_strategy ON backtests (asset, strategy)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_params ON backtests (short_threshold, long_threshold, leverage)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_returns ON backtests (total_return DESC)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_sharpe ON backtests (sharpe_ratio DESC)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_run ON backtests (run_id)`);
-
-  // Prepare insert statement
-  const insertStmt = db.prepare(`
-    INSERT INTO backtests (
-      run_id, timestamp, asset, timeframe, strategy,
-      short_threshold, long_threshold, leverage,
-      total_return, sharpe_ratio, max_drawdown,
-      num_trades, win_rate, liquidations,
-      time_in_market, fees, funding
-    ) VALUES (
-      $run_id, $timestamp, $asset, $timeframe, $strategy,
-      $short_threshold, $long_threshold, $leverage,
-      $total_return, $sharpe_ratio, $max_drawdown,
-      $num_trades, $win_rate, $liquidations,
-      $time_in_market, $fees, $funding
-    )
-  `);
-
-  // Use transaction for fast batch insert
-  const insertMany = db.transaction((results) => {
-    for (const r of results) {
-      insertStmt.run({
-        $run_id: runId,
-        $timestamp: timestamp,
-        $asset: CONFIG.ASSET,
-        $timeframe: CONFIG.TIMEFRAME,
-        $strategy: 'momentum',
-        $short_threshold: r.shortThreshold,
-        $long_threshold: r.longThreshold,
-        $leverage: r.leverage,
-        $total_return: r.totalReturnPercent,
-        $sharpe_ratio: r.sharpeRatio,
-        $max_drawdown: r.maxDrawdown,
-        $num_trades: r.numTrades,
-        $win_rate: r.winRate,
-        $liquidations: r.liquidations,
-        $time_in_market: r.timeInMarket,
-        $fees: r.totalFeesPaid,
-        $funding: r.totalFundingPaid
-      });
-    }
+  const writer = createRollingResultsWriter(dbPath, {
+    runId,
+    timestamp: runTimestamp,
+    asset: CONFIG.ASSET,
+    timeframe: CONFIG.TIMEFRAME,
+    strategy: CONFIG.STRATEGY,
+    windowSizeDays: CONFIG.ROLLING_DAYS
   });
 
-  // Insert all results in one transaction
-  insertMany(results);
+  const totalIterations = combinations.length * windows.length;
+  let totalRecords = 0;
+  const startTime = Date.now();
 
-  console.log(chalk.green(`\n✓ Results saved to SQLite: ${dbPath}`));
+  const isTTY = typeof process.stdout.isTTY === 'boolean' ? Boolean(process.stdout.isTTY) : false;
+  const enableProgress = isTTY && totalIterations > 0;
+  let progressBars: cliProgress.MultiBar | null = null;
+  let overallBar: cliProgress.SingleBar | null = null;
+  let windowBar: cliProgress.SingleBar | null = null;
+  let completedIterations = 0;
+  let lastProgressLog = Date.now();
+  const PROGRESS_LOG_INTERVAL_MS = 1000;
+
+  if (enableProgress) {
+    progressBars = new cliProgress.MultiBar(
+      {
+        format: '{name} [{bar}] {percentage}% | ETA: {eta_formatted} | {value}/{total}',
+        hideCursor: true,
+        clearOnComplete: false,
+        stopOnComplete: true,
+        autopadding: true
+      },
+      cliProgress.Presets.shades_classic
+    );
+
+    overallBar = progressBars.create(totalIterations, 0, { name: 'Total   ' });
+    windowBar = progressBars.create(windows.length, 0, { name: 'Windows' });
+  }
+
+  const emitLog = (message: string) => {
+    if (progressBars) {
+      progressBars.log(message);
+    } else {
+      console.log(message);
+    }
+  };
+
+  const maybeLogProgress = () => {
+    if (enableProgress) return;
+    if (!totalIterations) return;
+
+    const now = Date.now();
+    if (completedIterations === totalIterations || now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {
+      const percent = ((completedIterations / totalIterations) * 100).toFixed(2);
+      console.log(chalk.gray(`Progress ${completedIterations}/${totalIterations} (${percent}%)`));
+      lastProgressLog = now;
+    }
+  };
+
+  try {
+    for (let w = 0; w < windows.length; w++) {
+      const windowInfo = windows[w];
+      emitLog(chalk.cyan(`[Window ${w + 1}/${windows.length}] ${windowInfo.start} → ${windowInfo.end} (${windowInfo.data.length} points)`));
+
+      const windowResults: WindowedBacktestResult[] = [];
+      for (const combo of combinations) {
+        const backtestResult = runBacktest(
+          windowInfo.data,
+          combo.leverage,
+          combo.short,
+          combo.long,
+          combo.extremeLow,
+          combo.extremeHigh,
+          CONFIG.STRATEGY
+        );
+
+        const windowRecord: WindowedBacktestResult = {
+          ...backtestResult,
+          windowIndex: windowInfo.index,
+          windowStart: windowInfo.start,
+          windowEnd: windowInfo.end,
+          sampleCount: windowInfo.data.length
+        };
+
+        windowResults.push(windowRecord);
+        overallBar?.increment();
+        completedIterations++;
+        maybeLogProgress();
+      }
+
+      if (!windowResults.length) {
+        emitLog(chalk.yellow('    Skipping window due to insufficient data.'));
+        windowBar?.increment();
+        continue;
+      }
+
+      writer.insert(windowResults);
+      totalRecords += windowResults.length;
+
+      const bestByReturn = windowResults.reduce((best, current) =>
+        current.totalReturnPercent > best.totalReturnPercent ? current : best
+      );
+      const bestBySharpe = windowResults.reduce((best, current) =>
+        current.sharpeRatio > best.sharpeRatio ? current : best
+      );
+
+      const completed = (w + 1) * combinations.length;
+      const progressPercent = ((completed / totalIterations) * 100).toFixed(1);
+
+      emitLog(chalk.green(`    Best return: ${bestByReturn.totalReturnPercent.toFixed(1)}% (${bestByReturn.leverage}x, short<=${bestByReturn.shortThreshold}, long>=${bestByReturn.longThreshold})`));
+      emitLog(chalk.blue(`    Best Sharpe: ${bestBySharpe.sharpeRatio.toFixed(2)} (${bestBySharpe.totalReturnPercent.toFixed(1)}% return)`));
+
+      const progressLine = progressBars
+        ? chalk.gray(`    Stored ${windowResults.length} records`)
+        : chalk.gray(`    Stored ${windowResults.length} records · overall progress ${progressPercent}% (${completed}/${totalIterations})`);
+      emitLog(progressLine);
+      emitLog('');
+
+      windowBar?.increment();
+    }
+  } finally {
+    progressBars?.stop();
+    writer.close();
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(chalk.green(`\n✓ Completed ${windows.length} windows and ${totalRecords} backtests in ${elapsed}s`));
+  console.log(chalk.green(`✓ Results saved to SQLite: ${dbPath}`));
   console.log(chalk.yellow(`  Run ID: ${runId}`));
-  console.log(chalk.cyan(`  Records inserted: ${results.length}`));
 
-  // Query and display some stats
-  const stats = db.prepare(`
-    SELECT COUNT(*) as total_records,
-           COUNT(DISTINCT run_id) as total_runs
-    FROM backtests
-  `).get();
-
-  console.log(chalk.blue(`  Total records in DB: ${stats.total_records}`));
-  console.log(chalk.blue(`  Total runs: ${stats.total_runs}`));
-
-  // Close database
-  db.close();
-  
-  console.log(chalk.cyan.bold('\n✨ Backtest complete!\n'));
+  console.log(chalk.cyan.bold('\n✨ Rolling backtest complete!\n'));
 }
 
 // Run the backtest

@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
       leverage: Number(body.leverage) || 4,
       lowThreshold: Number(body.lowThreshold) || 49,
       highThreshold: Number(body.highThreshold) || 50,
+      extremeLowThreshold: Number(body.extremeLowThreshold ?? 0) || 0,
+      extremeHighThreshold: Number(body.extremeHighThreshold ?? 100) || 100,
       maxPositionRatio: Number(body.maxPositionRatio) || 0.7,
       strategy: body.strategy || 'momentum',
       enabled: body.enabled !== undefined ? body.enabled : true,
@@ -40,6 +42,20 @@ export async function POST(request: NextRequest) {
     if (config.highThreshold < 0 || config.highThreshold > 100) {
       return NextResponse.json(
         { error: 'High threshold must be between 0 and 100' },
+        { status: 400 }
+      )
+    }
+
+    if (config.extremeLowThreshold < 0 || config.extremeLowThreshold > 100) {
+      return NextResponse.json(
+        { error: 'Extreme low threshold must be between 0 and 100' },
+        { status: 400 }
+      )
+    }
+
+    if (config.extremeHighThreshold < 0 || config.extremeHighThreshold > 100) {
+      return NextResponse.json(
+        { error: 'Extreme high threshold must be between 0 and 100' },
         { status: 400 }
       )
     }
@@ -87,6 +103,8 @@ export async function GET() {
         leverage: 4,
         lowThreshold: 49,
         highThreshold: 50,
+        extremeLowThreshold: 0,
+        extremeHighThreshold: 100,
         maxPositionRatio: 0.7,
         strategy: 'momentum',
         enabled: true,

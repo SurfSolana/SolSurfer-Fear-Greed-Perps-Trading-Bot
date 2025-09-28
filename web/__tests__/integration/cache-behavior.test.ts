@@ -62,6 +62,8 @@ describe('Cache Hit/Miss Behavior - Integration Tests', () => {
     leverage: 3,
     lowThreshold: 25,
     highThreshold: 75,
+    extremeLowThreshold: 0,
+    extremeHighThreshold: 100,
     strategy: 'contrarian'
   }
 
@@ -71,6 +73,8 @@ describe('Cache Hit/Miss Behavior - Integration Tests', () => {
     leverage: 5,
     lowThreshold: 30,
     highThreshold: 70,
+    extremeLowThreshold: 10,
+    extremeHighThreshold: 95,
     strategy: 'momentum'
   }
 
@@ -99,11 +103,11 @@ describe('Cache Hit/Miss Behavior - Integration Tests', () => {
     test('should generate correct cache key pattern', () => {
       const cacheKey = testCacheServer.getCacheKeyPublic(testParams1)
 
-      // Verify cache key matches expected pattern: {asset}-{timeframe}-{leverage}x-{lowThreshold}-{highThreshold}-{strategy}
-      expect(cacheKey).toBe('ETH-4h-3x-25-75-contrarian')
+      // Verify cache key matches expected pattern: {asset}-{timeframe}-{leverage}x-{lowThreshold}-{highThreshold}-{extremeLow}-{extremeHigh}-{strategy}
+      expect(cacheKey).toBe('ETH-4h-3x-25-75-0-100-contrarian')
 
       const cacheKey2 = testCacheServer.getCacheKeyPublic(testParams2)
-      expect(cacheKey2).toBe('SOL-4h-5x-30-70-momentum')
+      expect(cacheKey2).toBe('SOL-4h-5x-30-70-10-95-momentum')
     })
 
     test('should generate different keys for different parameters', () => {

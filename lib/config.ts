@@ -3,6 +3,8 @@ export interface TradingConfig {
   leverage: number
   lowThreshold: number
   highThreshold: number
+  extremeLowThreshold: number
+  extremeHighThreshold: number
   maxPositionRatio: number
   strategy: 'momentum' | 'contrarian'
   enabled: boolean
@@ -14,6 +16,8 @@ export const DEFAULT_CONFIG: TradingConfig = {
   leverage: 4,
   lowThreshold: 49,
   highThreshold: 50,
+  extremeLowThreshold: 0,
+  extremeHighThreshold: 100,
   maxPositionRatio: 1.0,
   strategy: 'momentum',
   enabled: true,

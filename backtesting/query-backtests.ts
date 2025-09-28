@@ -20,8 +20,9 @@ const queries = {
   top: (limit = 10) => {
     console.time('Query time');
     const results = db.prepare(`
-      SELECT asset, strategy, short_threshold, long_threshold, leverage,
-             total_return, sharpe_ratio, max_drawdown, num_trades, win_rate
+      SELECT asset, strategy, short_threshold, long_threshold,
+             extreme_low_threshold, extreme_high_threshold, override_count,
+             leverage, total_return, sharpe_ratio, max_drawdown, num_trades, win_rate
       FROM backtests
       ORDER BY total_return DESC
       LIMIT ?
@@ -34,8 +35,9 @@ const queries = {
   sharpe: (limit = 10) => {
     console.time('Query time');
     const results = db.prepare(`
-      SELECT asset, strategy, short_threshold, long_threshold, leverage,
-             total_return, sharpe_ratio, max_drawdown, num_trades, win_rate
+      SELECT asset, strategy, short_threshold, long_threshold,
+             extreme_low_threshold, extreme_high_threshold, override_count,
+             leverage, total_return, sharpe_ratio, max_drawdown, num_trades, win_rate
       FROM backtests
       ORDER BY sharpe_ratio DESC
       LIMIT ?
@@ -45,15 +47,28 @@ const queries = {
   },
 
   // Get specific parameters
-  params: (asset: string, shortThreshold: number, longThreshold: number, leverage: number) => {
+  params: (
+    asset: string,
+    shortThreshold: number,
+    longThreshold: number,
+    leverage: number,
+    extremeLow?: number,
+    extremeHigh?: number
+  ) => {
     console.time('Query time');
-    const result = db.prepare(`
+    const hasExtremeFilters = typeof extremeLow === 'number' && typeof extremeHigh === 'number';
+    const sql = `
       SELECT * FROM backtests
       WHERE asset = ? AND short_threshold = ?
         AND long_threshold = ? AND leverage = ?
+        ${hasExtremeFilters ? 'AND extreme_low_threshold = ? AND extreme_high_threshold = ?' : ''}
       ORDER BY timestamp DESC
       LIMIT 1
-    `).get(asset, shortThreshold, longThreshold, leverage);
+    `;
+    const params = hasExtremeFilters
+      ? [asset, shortThreshold, longThreshold, leverage, extremeLow, extremeHigh]
+      : [asset, shortThreshold, longThreshold, leverage];
+    const result = db.prepare(sql).get(...params);
     console.timeEnd('Query time');
     return result;
   },
@@ -112,10 +127,19 @@ switch (command) {
 
   case 'params':
     if (args.length < 5) {
-      console.log(chalk.red('Usage: bun query-backtests.ts params <asset> <short> <long> <leverage>'));
+      console.log(chalk.red('Usage: bun query-backtests.ts params <asset> <short> <long> <leverage> [extremeLow] [extremeHigh]'));
       break;
     }
-    const paramResult = queries.params(args[1], parseInt(args[2]), parseInt(args[3]), parseInt(args[4]));
+    const extremeLow = args[5] !== undefined ? parseInt(args[5]) : undefined;
+    const extremeHigh = args[6] !== undefined ? parseInt(args[6]) : undefined;
+    const paramResult = queries.params(
+      args[1],
+      parseInt(args[2]),
+      parseInt(args[3]),
+      parseInt(args[4]),
+      extremeLow,
+      extremeHigh
+    );
     console.log(chalk.green('Specific Parameter Result:\n'));
     console.table(paramResult ? [paramResult] : []);
     break;
@@ -136,7 +160,7 @@ switch (command) {
     console.log(chalk.yellow('Available commands:\n'));
     console.log('  top [limit]     - Show top performers by return');
     console.log('  sharpe [limit]  - Show top performers by Sharpe ratio');
-    console.log('  params <asset> <short> <long> <leverage> - Query specific parameters');
+    console.log('  params <asset> <short> <long> <leverage> [extremeLow] [extremeHigh] - Query specific parameters');
     console.log('  stats           - Show database statistics');
     console.log('  best            - Show best config for each asset');
     console.log('\nExample: bun query-backtests.ts top 20');

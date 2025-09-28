@@ -76,6 +76,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const extremeLow = params.extremeLowThreshold ?? 0
+    const extremeHigh = params.extremeHighThreshold ?? 100
+
+    if (extremeLow < 0 || extremeLow > 100 || extremeHigh < 0 || extremeHigh > 100) {
+      return NextResponse.json(
+        { error: 'Extreme thresholds must be between 0 and 100' },
+        { status: 400 }
+      )
+    }
+
+    if (extremeLow >= extremeHigh) {
+      return NextResponse.json(
+        { error: 'Extreme low threshold must be less than extreme high threshold' },
+        { status: 400 }
+      )
+    }
+
+    if (extremeLow > params.lowThreshold) {
+      return NextResponse.json(
+        { error: 'Extreme low threshold must be ≤ low threshold' },
+        { status: 400 }
+      )
+    }
+
+    if (extremeHigh < params.highThreshold) {
+      return NextResponse.json(
+        { error: 'Extreme high threshold must be ≥ high threshold' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedParams: BacktestParams = {
+      ...params,
+      extremeLowThreshold: extremeLow,
+      extremeHighThreshold: extremeHigh
+    }
+
     // Execute backtest with force refresh logic
     let result
     let cached = false
@@ -83,18 +120,18 @@ export async function POST(request: NextRequest) {
 
     if (forceRefresh) {
       // Force fresh execution, skip cache check
-      result = await backtestCacheServer.runAndCache(params)
+      result = await backtestCacheServer.runAndCache(normalizedParams)
       cached = false
     } else {
       // Check cache first
-      const cachedResult = await backtestCacheServer.get(params)
+      const cachedResult = await backtestCacheServer.get(normalizedParams)
       if (cachedResult) {
         result = cachedResult
         cached = true
         cacheAge = Date.now() - cachedResult.timestamp
       } else {
         // Cache miss, run fresh
-        result = await backtestCacheServer.runAndCache(params)
+        result = await backtestCacheServer.runAndCache(normalizedParams)
         cached = false
       }
     }

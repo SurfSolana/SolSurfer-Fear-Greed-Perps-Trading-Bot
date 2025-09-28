@@ -79,6 +79,8 @@ export interface TradingParameters {
   asset?: 'SOL' | 'ETH' | 'BTC';
   lowThreshold?: number; // 0-100
   highThreshold?: number; // 0-100
+  extremeLowThreshold?: number;
+  extremeHighThreshold?: number;
   leverage: number; // 1-20
   strategy?: 'contrarian' | 'momentum';
   fgiBuyThreshold?: number; // 0-100
@@ -97,6 +99,8 @@ export interface TradingConfig {
   leverage: number;
   lowThreshold: number;
   highThreshold: number;
+  extremeLowThreshold: number;
+  extremeHighThreshold: number;
   maxPositionRatio: number;
   strategy: 'momentum' | 'contrarian';
   enabled: boolean;

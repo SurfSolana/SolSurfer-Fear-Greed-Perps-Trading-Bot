@@ -3,6 +3,8 @@
   "leverage": 2,
   "lowThreshold": 40,
   "highThreshold": 60,
+  "extremeLowThreshold": 0,
+  "extremeHighThreshold": 100,
   "maxPositionRatio": 1,
   "strategy": "contrarian",
   "enabled": true,

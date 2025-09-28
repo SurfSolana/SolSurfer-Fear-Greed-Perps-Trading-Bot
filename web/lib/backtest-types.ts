@@ -14,6 +14,10 @@ export interface BacktestParams {
   lowThreshold: number
   /** FGI sell threshold (2-100) */
   highThreshold: number
+  /** Optional extreme FGI level to flip contrarian longs to momentum shorts */
+  extremeLowThreshold?: number
+  /** Optional extreme FGI level to flip contrarian shorts to momentum longs */
+  extremeHighThreshold?: number
   /** Trading strategy */
   strategy: 'contrarian' | 'momentum'
   /** Optional historical period */
@@ -48,6 +52,8 @@ export interface BacktestResult {
   avgWin?: number
   /** Average losing trade size (derived) */
   avgLoss?: number
+  /** Number of momentum override activations during the run */
+  overrides?: number
 }
 
 /** Request payload for backtest computation */

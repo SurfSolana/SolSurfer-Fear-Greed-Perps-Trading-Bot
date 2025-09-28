@@ -9,17 +9,36 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import Database from 'better-sqlite3'
 import { BacktestParams, BacktestResult, CacheEntry } from './backtest-types'
-import { parseBacktestCSV, BacktestCSVRow } from './csv-parser'
 
 const execAsync = promisify(exec)
 
 // Types are now imported from backtest-types.ts
 
+interface BacktestTableRow {
+  total_return: number
+  sharpe_ratio: number
+  max_drawdown: number
+  num_trades: number
+  win_rate: number
+  liquidations: number
+  fees: number
+  funding: number
+  time_in_market: number
+  override_count: number
+  extreme_low_threshold: number
+  extreme_high_threshold: number
+}
+
 export class BacktestCacheServer {
-  private cacheDir = '/Users/alexnewman/Scripts/lifeguard-token-vault/web/.cache/backtests'
-  private permanentCacheDir = '/Users/alexnewman/Scripts/lifeguard-token-vault/web/.cache/backtests/permanent'
-  private backtestScriptPath = '/Users/alexnewman/Scripts/lifeguard-token-vault/backtesting/fgi-leverage-backtest.ts'
+  private projectRoot = path.basename(process.cwd()) === 'web'
+    ? path.resolve(process.cwd(), '..')
+    : process.cwd()
+  private cacheDir = path.join(this.projectRoot, 'web', '.cache', 'backtests')
+  private permanentCacheDir = path.join(this.cacheDir, 'permanent')
+  private backtestScriptPath = path.join(this.projectRoot, 'backtesting', 'fgi-leverage-backtest.ts')
+  private databasePath = path.join(this.projectRoot, 'backtesting', 'backtest-results', 'all-backtests.db')
   private staleThreshold = 24 * 60 * 60 * 1000 // 24 hours in ms
   
   constructor() {
@@ -40,7 +59,9 @@ export class BacktestCacheServer {
    * Pattern: {asset}-{timeframe}-{leverage}x-{lowThreshold}-{highThreshold}-{strategy}[-{dateRange}]
    */
   private getCacheKey(params: BacktestParams): string {
-    const baseKey = `${params.asset}-${params.timeframe}-${params.leverage}x-${params.lowThreshold}-${params.highThreshold}-${params.strategy}`
+    const extremeLow = params.extremeLowThreshold ?? 0
+    const extremeHigh = params.extremeHighThreshold ?? 100
+    const baseKey = `${params.asset}-${params.timeframe}-${params.leverage}x-${params.lowThreshold}-${params.highThreshold}-${extremeLow}-${extremeHigh}-${params.strategy}`
     if (params.dateRange) {
       return `${baseKey}-${params.dateRange.start}-${params.dateRange.end}`
     }
@@ -153,50 +174,98 @@ export class BacktestCacheServer {
 
     console.log(`[BACKTEST EXEC] Starting backtest execution for ${key}`)
 
-    // Build command arguments
+    const extremeLow = Math.round(params.extremeLowThreshold ?? 0)
+    const extremeHigh = Math.round(params.extremeHighThreshold ?? 100)
+    const scriptRelativePath = path.relative(this.projectRoot, this.backtestScriptPath)
+
     const args = [
       `--asset=${params.asset}`,
       `--timeframe=${params.timeframe}`,
       `--leverage=${params.leverage}`,
       `--short-start=${params.lowThreshold}`,
-      `--short-end=${params.lowThreshold}`, // Single point, not a range
+      `--short-end=${params.lowThreshold}`,
       `--long-start=${params.highThreshold}`,
-      `--long-end=${params.highThreshold}`, // Single point, not a range
+      `--long-end=${params.highThreshold}`,
+      `--extreme-low=${extremeLow}`,
+      `--extreme-high=${extremeHigh}`,
+      `--strategy=${params.strategy}`,
       `--days=90`,
-      `--detailed=true`
+      `--detailed=false`
     ].join(' ')
 
-    const command = `cd /Users/alexnewman/Scripts/lifeguard-token-vault && bun run ${this.backtestScriptPath} ${args}`
+    const command = `cd ${this.projectRoot} && bun run ${scriptRelativePath} ${args}`
 
     try {
       const { stdout, stderr } = await execAsync(command)
-
-      // Extract the CSV filename from the output
-      const csvMatch = stdout.match(/CSV exported to: (.+\.csv)/)
-      if (!csvMatch) {
-        throw new Error('Could not find CSV output file')
+      if (stderr) {
+        console.warn(`[BACKTEST EXEC] stderr for ${key}:`, stderr)
       }
 
-      // The CSV path is relative to the project root, not the web directory
-      const csvFilePath = path.join('/Users/alexnewman/Scripts/lifeguard-token-vault', csvMatch[1])
-      const csvContent = await fs.readFile(csvFilePath, 'utf-8')
-      const csvData = parseBacktestCSV(csvContent)
-
-      // Find the result that matches our exact parameters
-      const matchingResult = csvData.find(row =>
-        row.leverage === params.leverage &&
-        row.shortThreshold === params.lowThreshold &&
-        row.longThreshold === params.highThreshold
-      )
-
-      if (!matchingResult) {
-        throw new Error('No matching result found in backtest output')
+      const runIdMatch = stdout.match(/Run ID:\s*([^\s]+)/)
+      if (!runIdMatch) {
+        console.error(`[BACKTEST EXEC] Unable to parse run ID from output for ${key}. Output:\n${stdout}`)
+        throw new Error('Could not parse run ID from backtest output')
       }
 
-      const executionTime = Date.now() - startTime
-      console.log(`[BACKTEST EXEC] Backtest execution completed for ${key} in ${executionTime}ms`)
-      return this.transformCSVToBacktestResult(matchingResult, params, executionTime)
+      const runId = runIdMatch[1]
 
+      const db = new Database(this.databasePath, { readonly: true })
+      try {
+        const row = db.prepare(`
+          SELECT
+            total_return,
+            sharpe_ratio,
+            max_drawdown,
+            num_trades,
+            win_rate,
+            liquidations,
+            fees,
+            funding,
+            time_in_market,
+            override_count,
+            extreme_low_threshold,
+            extreme_high_threshold
+          FROM backtests
+          WHERE run_id = ?
+            AND asset = ?
+            AND timeframe = ?
+            AND strategy = ?
+            AND short_threshold = ?
+            AND long_threshold = ?
+            AND extreme_low_threshold = ?
+            AND extreme_high_threshold = ?
+            AND leverage = ?
+          ORDER BY timestamp DESC
+          LIMIT 1
+        `).get(
+          runId,
+          params.asset.toUpperCase(),
+          params.timeframe,
+          params.strategy,
+          params.lowThreshold,
+          params.highThreshold,
+          extremeLow,
+          extremeHigh,
+          params.leverage
+        ) as BacktestTableRow | undefined
+
+        if (!row) {
+          throw new Error('No matching result found in backtest database output')
+        }
+
+        const executionTime = Date.now() - startTime
+        console.log(`[BACKTEST EXEC] Backtest execution completed for ${key} in ${executionTime}ms`)
+
+        const normalizedParams: BacktestParams = {
+          ...params,
+          extremeLowThreshold: row.extreme_low_threshold,
+          extremeHighThreshold: row.extreme_high_threshold
+        }
+
+        return this.transformRowToBacktestResult(row, normalizedParams, executionTime)
+      } finally {
+        db.close()
+      }
     } catch (error) {
       const executionTime = Date.now() - startTime
       console.error(`[BACKTEST EXEC] Backtest execution failed for ${key} after ${executionTime}ms:`, error)
@@ -208,21 +277,32 @@ export class BacktestCacheServer {
   /**
    * Transform CSV row to BacktestResult format
    */
-  private transformCSVToBacktestResult(csvRow: BacktestCSVRow, params: BacktestParams, executionTime: number): BacktestResult {
+  private transformRowToBacktestResult(row: BacktestTableRow, params: BacktestParams, executionTime: number): BacktestResult {
+    const totalReturn = row.total_return
+    const maxDrawdown = row.max_drawdown
+    const winRate = row.win_rate
+    const numTrades = row.num_trades
+    const normalizedTrades = Math.max(numTrades, 1)
+
+    const avgWin = winRate > 0 ? (totalReturn * (winRate / 100)) / normalizedTrades : 0
+    const avgLoss = winRate < 100 ? (totalReturn * ((100 - winRate) / 100)) / normalizedTrades : 0
+    const profitFactor = Math.abs(maxDrawdown) > 0 ? totalReturn / Math.abs(maxDrawdown) : 0
+
     return {
-      returns: csvRow.totalReturn,
-      maxDrawdown: csvRow.maxDrawdown,
-      winRate: csvRow.winRate,
-      sharpeRatio: csvRow.sharpeRatio,
-      trades: csvRow.numTrades,
-      fees: params.leverage * 0.5, // Estimate based on leverage
-      liquidated: csvRow.liquidations > 0,
+      returns: totalReturn,
+      maxDrawdown,
+      winRate,
+      sharpeRatio: row.sharpe_ratio,
+      trades: numTrades,
+      fees: row.fees,
+      liquidated: row.liquidations > 0,
       timestamp: Date.now(),
       params,
       executionTime,
-      profitFactor: csvRow.winRate > 0 ? csvRow.totalReturn / Math.abs(csvRow.maxDrawdown) : 0,
-      avgWin: csvRow.winRate > 0 ? (csvRow.totalReturn * csvRow.winRate / 100) / csvRow.numTrades : 0,
-      avgLoss: csvRow.winRate < 100 ? (csvRow.totalReturn * (100 - csvRow.winRate) / 100) / csvRow.numTrades : 0
+      profitFactor,
+      avgWin,
+      avgLoss,
+      overrides: row.override_count
     }
   }
 

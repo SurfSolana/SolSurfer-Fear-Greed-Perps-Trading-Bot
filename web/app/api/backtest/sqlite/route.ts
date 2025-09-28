@@ -12,6 +12,9 @@ interface BacktestResult {
   strategy: string;
   short_threshold: number;
   long_threshold: number;
+  extreme_low_threshold: number;
+  extreme_high_threshold: number;
+  override_count: number;
   leverage: number;
   total_return: number;
   sharpe_ratio: number;
@@ -30,7 +33,9 @@ interface BacktestResult {
 const getByParams = db.prepare(`
   SELECT * FROM backtests
   WHERE asset = ? AND strategy = ?
-    AND short_threshold = ? AND long_threshold = ? AND leverage = ?
+    AND short_threshold = ? AND long_threshold = ?
+    AND leverage = ?
+    AND extreme_low_threshold = ? AND extreme_high_threshold = ?
   ORDER BY timestamp DESC
   LIMIT 1
 `);
@@ -38,6 +43,7 @@ const getByParams = db.prepare(`
 const getBestForAsset = db.prepare(`
   SELECT * FROM backtests
   WHERE asset = ? AND strategy = ?
+    AND extreme_low_threshold = ? AND extreme_high_threshold = ?
   ORDER BY total_return DESC
   LIMIT 10
 `);
@@ -45,6 +51,7 @@ const getBestForAsset = db.prepare(`
 const getAllForAssetStrategy = db.prepare(`
   SELECT * FROM backtests
   WHERE asset = ? AND strategy = ?
+    AND extreme_low_threshold = ? AND extreme_high_threshold = ?
   ORDER BY short_threshold, long_threshold, leverage
 `);
 
@@ -58,6 +65,7 @@ const getStats = db.prepare(`
     AVG(max_drawdown) as avg_drawdown
   FROM backtests
   WHERE asset = ? AND strategy = ?
+    AND extreme_low_threshold = ? AND extreme_high_threshold = ?
 `);
 
 export async function GET(request: NextRequest) {
@@ -67,6 +75,23 @@ export async function GET(request: NextRequest) {
     const strategy = searchParams.get('strategy') || 'momentum';
     const fgiThreshold = searchParams.get('fgi');
     const leverage = searchParams.get('leverage');
+    const extremeLowParam = searchParams.get('extremeLow');
+    const extremeHighParam = searchParams.get('extremeHigh');
+
+    const extremeLow = extremeLowParam !== null ? parseInt(extremeLowParam, 10) : 0;
+    const extremeHigh = extremeHighParam !== null ? parseInt(extremeHighParam, 10) : 100;
+
+    if (
+      Number.isNaN(extremeLow) || Number.isNaN(extremeHigh) ||
+      extremeLow < 0 || extremeLow > 100 ||
+      extremeHigh < 0 || extremeHigh > 100 ||
+      extremeLow > extremeHigh
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid extreme thresholds. Provide values between 0-100 with extremeLow ≤ extremeHigh.' },
+        { status: 400 }
+      );
+    }
 
     // For momentum strategy, fgi is the long threshold
     // For contrarian, it's the short threshold
@@ -80,7 +105,9 @@ export async function GET(request: NextRequest) {
         strategy,
         shortThreshold,
         longThreshold,
-        parseInt(leverage)
+        parseInt(leverage),
+        extremeLow,
+        extremeHigh
       ) as BacktestResult | undefined;
 
       if (result) {
@@ -96,7 +123,10 @@ export async function GET(request: NextRequest) {
             liquidations: result.liquidations,
             timeInMarket: result.time_in_market,
             fees: result.fees,
-            funding: result.funding
+            funding: result.funding,
+            overrideCount: result.override_count,
+            extremeLowThreshold: result.extreme_low_threshold,
+            extremeHighThreshold: result.extreme_high_threshold
           },
           metadata: {
             asset,
@@ -104,7 +134,9 @@ export async function GET(request: NextRequest) {
             fgiThreshold: parseInt(fgiThreshold),
             leverage: parseInt(leverage),
             timestamp: result.timestamp,
-            runId: result.run_id
+            runId: result.run_id,
+            extremeLowThreshold: result.extreme_low_threshold,
+            extremeHighThreshold: result.extreme_high_threshold
           }
         });
       } else {
@@ -116,7 +148,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all results for asset/strategy combination
-    const allResults = getAllForAssetStrategy.all(asset.toUpperCase(), strategy) as BacktestResult[];
+    const allResults = getAllForAssetStrategy.all(asset.toUpperCase(), strategy, extremeLow, extremeHigh) as BacktestResult[];
 
     // Transform to nested structure for compatibility
     const resultsMap: any = {};
@@ -140,15 +172,18 @@ export async function GET(request: NextRequest) {
         liquidations: result.liquidations,
         timeInMarket: result.time_in_market,
         fees: result.fees,
-        funding: result.funding
+        funding: result.funding,
+        overrideCount: result.override_count,
+        extremeLowThreshold: result.extreme_low_threshold,
+        extremeHighThreshold: result.extreme_high_threshold
       };
     }
 
     // Get best performers
-    const bestPerformers = getBestForAsset.all(asset.toUpperCase(), strategy) as BacktestResult[];
+    const bestPerformers = getBestForAsset.all(asset.toUpperCase(), strategy, extremeLow, extremeHigh) as BacktestResult[];
 
     // Get statistics
-    const stats = getStats.get(asset.toUpperCase(), strategy) as any;
+    const stats = getStats.get(asset.toUpperCase(), strategy, extremeLow, extremeHigh) as any;
 
     return NextResponse.json({
       success: true,
@@ -158,7 +193,10 @@ export async function GET(request: NextRequest) {
         leverage: p.leverage,
         totalReturn: p.total_return,
         monthlyReturn: p.total_return / 12,
-        sharpeRatio: p.sharpe_ratio
+        sharpeRatio: p.sharpe_ratio,
+        overrideCount: p.override_count,
+        extremeLowThreshold: p.extreme_low_threshold,
+        extremeHighThreshold: p.extreme_high_threshold
       })),
       metadata: {
         asset,
@@ -169,6 +207,8 @@ export async function GET(request: NextRequest) {
         minReturn: stats.min_return,
         avgSharpe: stats.avg_sharpe,
         avgDrawdown: stats.avg_drawdown,
+        extremeLowThreshold: extremeLow,
+        extremeHighThreshold: extremeHigh,
         source: 'sqlite-consolidated',
         dbPath: 'backtesting/backtest-results/all-backtests.db'
       }
