@@ -47,7 +47,7 @@ import {
   IconInfoCircle,
   IconChartCandle,
   IconAdjustmentsHorizontal,
-  IconBrandBitcoin,
+  IconCurrencyBitcoin,
   IconCurrencyEthereum,
   IconCurrencySolana,
   IconMoodSmile,
@@ -100,7 +100,7 @@ interface RollingTradeSummary {
 }
 
 const assetIcons = {
-  BTC: IconBrandBitcoin,
+  BTC: IconCurrencyBitcoin,
   ETH: IconCurrencyEthereum,
   SOL: IconCurrencySolana
 }
